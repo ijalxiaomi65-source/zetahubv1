@@ -7,6 +7,7 @@ import Watch from "./pages/Watch";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
+import Admin from "./pages/Admin";
 
 export default function App() {
   return (
@@ -21,10 +22,11 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/admin" element={<Admin />} />
           </Routes>
         </main>
         <footer className="p-8 text-center text-white/40 text-sm border-t border-white/5">
-          &copy; 2026 AniStream Premium. All rights reserved.
+          &copy; 2026 ZetaHub Premium. All rights reserved.
         </footer>
       </div>
     </Router>

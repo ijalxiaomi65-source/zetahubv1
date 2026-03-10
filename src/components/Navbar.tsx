@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, User, Crown, LogOut, Menu, X } from "lucide-react";
+import { Search, User, Crown, LogOut, Menu, X, Sun, Moon } from "lucide-react";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,9 +14,17 @@ export default function Navbar() {
     
     const storedUser = localStorage.getItem("user");
     if (storedUser) setUser(JSON.parse(storedUser));
+
+    document.documentElement.setAttribute("data-theme", theme);
     
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "dark" ? "light" : "dark";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -25,23 +34,31 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "bg-[#050505]/90 backdrop-blur-md py-3 shadow-xl" : "bg-transparent py-6"}`}>
+    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "bg-[var(--bg)]/90 backdrop-blur-md py-3 shadow-xl" : "bg-transparent py-6"}`}>
       <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
         <div className="flex items-center gap-10">
           <Link to="/" className="text-2xl font-bold tracking-tighter flex items-center gap-2">
-            <span className="text-primary">ANI</span>STREAM
+            <span className="text-primary">ZETA</span>HUB
             <span className="bg-primary text-black text-[10px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest">PRO</span>
           </Link>
           
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-white/70">
-            <Link to="/" className="hover:text-white transition-colors">Home</Link>
-            <Link to="/trending" className="hover:text-white transition-colors">Trending</Link>
-            <Link to="/donghua" className="hover:text-white transition-colors">Donghua</Link>
-            <Link to="/movies" className="hover:text-white transition-colors">Movies</Link>
+          <div className="hidden md:flex items-center gap-6 text-sm font-medium opacity-70">
+            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
+            <Link to="/trending" className="hover:text-primary transition-colors">Trending</Link>
+            <Link to="/donghua" className="hover:text-primary transition-colors">Donghua</Link>
+            <Link to="/movies" className="hover:text-primary transition-colors">Movies</Link>
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6">
+          <button 
+            onClick={toggleTheme}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors"
+            title="Toggle Theme"
+          >
+            {theme === "dark" ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+
           <Link to="/search" className="p-2 hover:bg-white/10 rounded-full transition-colors">
             <Search size={20} />
           </Link>
@@ -60,7 +77,7 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <Link to="/login" className="bg-white text-black px-5 py-2 rounded-full text-sm font-bold hover:bg-primary hover:text-white transition-all">
+            <Link to="/login" className="bg-primary text-black px-5 py-2 rounded-full text-sm font-bold hover:scale-105 transition-all">
               Login
             </Link>
           )}

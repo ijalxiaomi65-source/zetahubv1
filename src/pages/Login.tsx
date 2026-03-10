@@ -8,12 +8,13 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [secret, setSecret] = useState("");
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-    const body = isLogin ? { email, password } : { email, password, name };
+    const body = isLogin ? { email, password } : { email, password, name, secret };
 
     const res = await fetch(endpoint, {
       method: "POST",
@@ -75,16 +76,32 @@ export default function Login() {
             </div>
           )}
 
+          {!isLogin && (
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Secret Key (Optional)</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                <input 
+                  type="password" 
+                  value={secret}
+                  onChange={(e) => setSecret(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
+                  placeholder="Owner Secret"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Email Address</label>
+            <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Email Address or Username</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
               <input 
-                type="email" 
+                type="text" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
-                placeholder="you@example.com"
+                placeholder="you@example.com or Username"
                 required
               />
             </div>

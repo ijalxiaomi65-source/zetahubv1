@@ -1,22 +1,40 @@
 import React, { useState, useEffect } from "react";
-import { User, Crown, History, Heart, Settings, Shield, Play } from "lucide-react";
+import { User, Crown, History, Heart, Settings, Shield, Play, ArrowLeft, Home } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function Profile() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem("token");
-      if (!token) return;
+      const localUser = JSON.parse(localStorage.getItem("user") || "null");
       
-      const res = await fetch("/api/user/profile", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
+      if (localUser) {
+        setUser(localUser);
+      }
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const res = await fetch("/api/user/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            setUser(data);
+            localStorage.setItem("user", JSON.stringify(data));
+          }
+        }
+      } catch (e) {
+        console.error("Profile fetch error:", e);
       }
       setLoading(false);
     };
@@ -27,22 +45,34 @@ export default function Profile() {
   if (!user) return <div className="h-screen flex items-center justify-center">Please login to view profile.</div>;
 
   return (
-    <div className="pt-32 px-12 max-w-7xl mx-auto">
+    <div className="pt-32 px-6 sm:px-12 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-12">
+        <div className="flex gap-4">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-primary font-bold hover:underline">
+            <ArrowLeft size={18} /> Back
+          </button>
+          <Link to="/" className="flex items-center gap-2 text-white/40 font-bold hover:text-white transition-all">
+            <Home size={18} /> Home
+          </Link>
+        </div>
+        <h1 className="text-2xl font-black tracking-tighter uppercase opacity-20">User Profile</h1>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
         {/* Sidebar */}
         <div className="space-y-8">
           <div className="glass-card p-8 text-center space-y-4">
             <div className="w-24 h-24 rounded-full bg-primary/20 mx-auto flex items-center justify-center border-2 border-primary/30 relative">
               <User size={48} className="text-primary" />
-              {user.role === "VIP" && (
-                <div className="absolute -bottom-2 -right-2 bg-yellow-500 p-1.5 rounded-full border-4 border-[#050505]">
+              {user.isVip && (
+                <div className="absolute -bottom-2 -right-2 bg-yellow-500 p-1.5 rounded-full border-4 border-[var(--bg)]">
                   <Crown size={16} className="text-black" fill="currentColor" />
                 </div>
               )}
             </div>
             <div>
               <h2 className="text-2xl font-black tracking-tighter">{user.name}</h2>
-              <p className="text-white/40 text-sm">{user.email}</p>
+              <p className="text-muted text-sm">{user.email}</p>
             </div>
             <div className="flex justify-center gap-2">
               <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest border border-primary/20">{user.role}</span>
@@ -54,19 +84,19 @@ export default function Profile() {
             <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-primary text-black font-bold">
               <User size={20} /> Profile Overview
             </button>
-            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-white/60 font-bold">
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-muted font-bold">
               <History size={20} /> Watch History
             </button>
-            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-white/60 font-bold">
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-muted font-bold">
               <Heart size={20} /> My Watchlist
             </button>
-            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-white/60 font-bold">
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-muted font-bold">
               <Settings size={20} /> Settings
             </button>
             {user.role === "OWNER" && (
-              <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-red-500/10 transition-all text-red-500 font-bold">
+              <Link to="/admin" className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-red-500/10 transition-all text-red-500 font-bold">
                 <Shield size={20} /> Admin Panel
-              </button>
+              </Link>
             )}
           </div>
         </div>

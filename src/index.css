@@ -8,16 +8,41 @@
   --font-display: "Anton", sans-serif;
 }
 
+:root {
+  --bg: #050505;
+  --text: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.05);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --text-muted: rgba(255, 255, 255, 0.4);
+}
+
+[data-theme="light"] {
+  --bg: #f5f5f5;
+  --text: #1a1a1a;
+  --card-bg: rgba(0, 0, 0, 0.05);
+  --card-border: rgba(0, 0, 0, 0.1);
+  --text-muted: rgba(0, 0, 0, 0.5);
+}
+
 @layer base {
   body {
-    @apply bg-[#050505] text-white font-sans;
+    background-color: var(--bg);
+    color: var(--text);
+    @apply font-sans transition-colors duration-300;
   }
 }
 
 .premium-gradient {
-  background: linear-gradient(to bottom, transparent, #050505);
+  background: linear-gradient(to bottom, transparent, var(--bg));
 }
 
 .glass-card {
-  @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-xl;
+  background-color: var(--card-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--card-border);
+  @apply rounded-xl;
+}
+
+.text-muted {
+  color: var(--text-muted);
 }
