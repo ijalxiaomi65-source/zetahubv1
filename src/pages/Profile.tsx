@@ -1,0 +1,119 @@
+import React, { useState, useEffect } from "react";
+import { User, Crown, History, Heart, Settings, Shield, Play } from "lucide-react";
+import { motion } from "framer-motion";
+
+export default function Profile() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      
+      const res = await fetch("/api/user/profile", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+      }
+      setLoading(false);
+    };
+    fetchProfile();
+  }, []);
+
+  if (loading) return <div className="h-screen flex items-center justify-center">Loading Profile...</div>;
+  if (!user) return <div className="h-screen flex items-center justify-center">Please login to view profile.</div>;
+
+  return (
+    <div className="pt-32 px-12 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+        {/* Sidebar */}
+        <div className="space-y-8">
+          <div className="glass-card p-8 text-center space-y-4">
+            <div className="w-24 h-24 rounded-full bg-primary/20 mx-auto flex items-center justify-center border-2 border-primary/30 relative">
+              <User size={48} className="text-primary" />
+              {user.role === "VIP" && (
+                <div className="absolute -bottom-2 -right-2 bg-yellow-500 p-1.5 rounded-full border-4 border-[#050505]">
+                  <Crown size={16} className="text-black" fill="currentColor" />
+                </div>
+              )}
+            </div>
+            <div>
+              <h2 className="text-2xl font-black tracking-tighter">{user.name}</h2>
+              <p className="text-white/40 text-sm">{user.email}</p>
+            </div>
+            <div className="flex justify-center gap-2">
+              <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest border border-primary/20">{user.role}</span>
+              {user.isVerified && <span className="bg-blue-500/10 text-blue-400 text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest border border-blue-500/20">Verified</span>}
+            </div>
+          </div>
+
+          <div className="glass-card p-4 space-y-1">
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl bg-primary text-black font-bold">
+              <User size={20} /> Profile Overview
+            </button>
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-white/60 font-bold">
+              <History size={20} /> Watch History
+            </button>
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-white/60 font-bold">
+              <Heart size={20} /> My Watchlist
+            </button>
+            <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-white/60 font-bold">
+              <Settings size={20} /> Settings
+            </button>
+            {user.role === "OWNER" && (
+              <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-red-500/10 transition-all text-red-500 font-bold">
+                <Shield size={20} /> Admin Panel
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="lg:col-span-3 space-y-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="glass-card p-8 space-y-2">
+              <p className="text-white/30 text-[10px] uppercase font-black tracking-widest">Watch Time</p>
+              <p className="text-3xl font-black tracking-tighter">124 <span className="text-sm font-normal text-white/40">Hours</span></p>
+            </div>
+            <div className="glass-card p-8 space-y-2">
+              <p className="text-white/30 text-[10px] uppercase font-black tracking-widest">Completed</p>
+              <p className="text-3xl font-black tracking-tighter">42 <span className="text-sm font-normal text-white/40">Anime</span></p>
+            </div>
+            <div className="glass-card p-8 space-y-2">
+              <p className="text-white/30 text-[10px] uppercase font-black tracking-widest">Comments</p>
+              <p className="text-3xl font-black tracking-tighter">89 <span className="text-sm font-normal text-white/40">Posts</span></p>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-3">
+              Continue Watching <History size={20} className="text-primary" />
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Mock History Item */}
+              <div className="group relative aspect-video rounded-2xl overflow-hidden border border-white/10">
+                <img src="https://picsum.photos/seed/anime1/800/450" className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt="History" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                <div className="absolute bottom-0 left-0 right-0 p-4">
+                  <h4 className="font-bold">Solo Leveling</h4>
+                  <p className="text-xs text-white/60">Episode 08 • 12:45 left</p>
+                  <div className="w-full h-1 bg-white/20 rounded-full mt-3 overflow-hidden">
+                    <div className="h-full w-2/3 bg-primary" />
+                  </div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-black">
+                    <Play size={24} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
