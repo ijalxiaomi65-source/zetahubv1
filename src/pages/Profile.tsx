@@ -6,12 +6,15 @@ import { Link, useNavigate } from "react-router-dom";
 export default function Profile() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [watchHistory, setWatchHistory] = useState<any[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchProfile = async () => {
       const token = localStorage.getItem("token");
       const localUser = JSON.parse(localStorage.getItem("user") || "null");
+      const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
+      setWatchHistory(history);
       
       if (localUser) {
         setUser(localUser);
@@ -123,23 +126,43 @@ export default function Profile() {
               Continue Watching <History size={20} className="text-primary" />
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Mock History Item */}
-              <div className="group relative aspect-video rounded-2xl overflow-hidden border border-white/10">
-                <img src="https://picsum.photos/seed/anime1/800/450" className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt="History" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <h4 className="font-bold">Solo Leveling</h4>
-                  <p className="text-xs text-white/60">Episode 08 • 12:45 left</p>
-                  <div className="w-full h-1 bg-white/20 rounded-full mt-3 overflow-hidden">
-                    <div className="h-full w-2/3 bg-primary" />
-                  </div>
+              {watchHistory.length > 0 ? (
+                watchHistory.map((item: any) => {
+                  const progress = (item.timestamp / item.duration) * 100;
+                  const timeLeft = Math.max(0, Math.floor((item.duration - item.timestamp) / 60));
+                  
+                  return (
+                    <Link 
+                      key={`${item.animeId}-${item.episode}`}
+                      to={`/watch/${item.animeId}/${item.episode}`}
+                      className="group relative aspect-video rounded-2xl overflow-hidden border border-white/10"
+                    >
+                      <img src={item.animeCover} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt={item.animeTitle} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h4 className="font-bold line-clamp-1">{item.animeTitle}</h4>
+                        <p className="text-xs text-white/60">Episode {item.episode} • {timeLeft}m left</p>
+                        <div className="w-full h-1 bg-white/20 rounded-full mt-3 overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-500" 
+                            style={{ width: `${Math.min(100, progress)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-black">
+                          <Play size={24} fill="currentColor" />
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="col-span-full py-12 text-center bg-white/5 rounded-2xl border border-white/5 border-dashed">
+                  <Play size={48} className="mx-auto text-white/10 mb-4" />
+                  <p className="text-white/40 font-bold">No watch history yet. Start watching some anime!</p>
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-black">
-                    <Play size={24} fill="currentColor" />
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

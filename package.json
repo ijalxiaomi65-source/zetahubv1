@@ -15,6 +15,7 @@
     "@google/genai": "^1.29.0",
     "@prisma/client": "^6.19.2",
     "@tailwindcss/vite": "^4.1.14",
+    "@types/video.js": "^7.3.58",
     "@vitejs/plugin-react": "^5.0.4",
     "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
@@ -25,6 +26,7 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "framer-motion": "^12.35.2",
+    "hls.js": "^1.6.15",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
@@ -34,6 +36,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.1",
     "tailwind-merge": "^3.5.0",
+    "video.js": "^8.23.7",
     "vite": "^6.2.0"
   },
   "devDependencies": {

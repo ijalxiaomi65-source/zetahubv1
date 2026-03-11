@@ -44,9 +44,10 @@ export default function Navbar() {
           
           <div className="hidden md:flex items-center gap-6 text-sm font-medium opacity-70">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <Link to="/trending" className="hover:text-primary transition-colors">Trending</Link>
+            <Link to="/gallery" className="hover:text-primary transition-colors">Gallery</Link>
             <Link to="/donghua" className="hover:text-primary transition-colors">Donghua</Link>
-            <Link to="/movies" className="hover:text-primary transition-colors">Movies</Link>
+            <Link to="/kdrama" className="hover:text-primary transition-colors">K-Drama</Link>
+            <Link to="/search" className="hover:text-primary transition-colors">Search</Link>
           </div>
         </div>
 

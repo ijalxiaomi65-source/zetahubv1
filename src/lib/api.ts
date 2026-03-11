@@ -1,6 +1,7 @@
 
 const ANILIST_URL = "/api/proxy/anilist";
 const JIKAN_URL = "/api/proxy/jikan";
+const CONSUMET_URL = "/api/proxy/consumet";
 
 // Simple in-memory cache
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -196,5 +197,149 @@ export const searchAnime = async (search: string) => {
   } catch (error) {
     console.error("searchAnime error:", error);
     throw error;
+  }
+};
+
+// Consumet Streaming API
+export const fetchAnimeEpisodes = async (id: string, retryCount = 0): Promise<any[]> => {
+  try {
+    const response = await fetch(`${CONSUMET_URL}/meta/anilist/info/${id}`);
+    if (!response.ok) throw new Error(`Failed to fetch episodes: ${response.status}`);
+    
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON");
+    }
+
+    const data = await response.json();
+    return data.episodes || [];
+  } catch (error) {
+    console.error("fetchAnimeEpisodes error:", error);
+    if (retryCount < 2) {
+      await sleep(1000);
+      return fetchAnimeEpisodes(id, retryCount + 1);
+    }
+    return [];
+  }
+};
+
+export const fetchStreamSources = async (episodeId: string, retryCount = 0): Promise<any> => {
+  try {
+    const response = await fetch(`${CONSUMET_URL}/meta/anilist/watch/${episodeId}`);
+    if (!response.ok) throw new Error(`Failed to fetch stream sources: ${response.status}`);
+    
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON");
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("fetchStreamSources error:", error);
+    if (retryCount < 2) {
+      await sleep(1000);
+      return fetchStreamSources(episodeId, retryCount + 1);
+    }
+    return null;
+  }
+};
+
+// K-Drama API (Using AsianLoad via Consumet)
+export const fetchTrendingKdrama = async (retryCount = 0): Promise<any[]> => {
+  try {
+    // Try AsianLoad first, then DramaCool as fallback
+    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const response = await fetch(`${CONSUMET_URL}/movies/${provider}/trending`);
+    if (!response.ok) throw new Error(`Failed to fetch trending K-Drama: ${response.status}`);
+    
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON");
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error("fetchTrendingKdrama error:", error);
+    if (retryCount < 3) {
+      await sleep(1000);
+      return fetchTrendingKdrama(retryCount + 1);
+    }
+    return [];
+  }
+};
+
+export const fetchPopularKdrama = async (retryCount = 0): Promise<any[]> => {
+  try {
+    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const response = await fetch(`${CONSUMET_URL}/movies/${provider}/popular`);
+    if (!response.ok) throw new Error(`Failed to fetch popular K-Drama: ${response.status}`);
+    
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("Response is not JSON");
+    }
+
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error("fetchPopularKdrama error:", error);
+    if (retryCount < 3) {
+      await sleep(1000);
+      return fetchPopularKdrama(retryCount + 1);
+    }
+    return [];
+  }
+};
+
+export const fetchKdramaDetails = async (id: string, retryCount = 0): Promise<any> => {
+  try {
+    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const response = await fetch(`${CONSUMET_URL}/movies/${provider}/info?id=${id}`);
+    if (!response.ok) throw new Error(`Failed to fetch K-Drama details: ${response.status}`);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("fetchKdramaDetails error:", error);
+    if (retryCount < 3) {
+      await sleep(1000);
+      return fetchKdramaDetails(id, retryCount + 1);
+    }
+    return null;
+  }
+};
+
+export const fetchKdramaStream = async (episodeId: string, mediaId: string, retryCount = 0): Promise<any> => {
+  try {
+    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const response = await fetch(`${CONSUMET_URL}/movies/${provider}/watch?episodeId=${episodeId}&mediaId=${mediaId}`);
+    if (!response.ok) throw new Error(`Failed to fetch K-Drama stream: ${response.status}`);
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("fetchKdramaStream error:", error);
+    if (retryCount < 3) {
+      await sleep(1000);
+      return fetchKdramaStream(episodeId, mediaId, retryCount + 1);
+    }
+    return null;
+  }
+};
+
+export const searchKdrama = async (query: string, retryCount = 0): Promise<any[]> => {
+  try {
+    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const response = await fetch(`${CONSUMET_URL}/movies/${provider}/${query}`);
+    if (!response.ok) throw new Error("Failed to search K-Drama");
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error("searchKdrama error:", error);
+    if (retryCount < 3) {
+      await sleep(1000);
+      return searchKdrama(query, retryCount + 1);
+    }
+    return [];
   }
 };

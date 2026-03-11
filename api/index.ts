@@ -6,13 +6,11 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const { PrismaClient } = require("@prisma/client");
-
 dotenv.config();
 
 let prisma: any;
 try {
+  const require = createRequire(import.meta.url);
   const { PrismaClient } = require("@prisma/client");
   prisma = new PrismaClient();
 } catch (e) {
@@ -21,6 +19,16 @@ try {
     user: {
       create: async () => { throw new Error("DB_MISSING") },
       findUnique: async () => { throw new Error("DB_MISSING") }
+    },
+    subscription: {
+      create: async () => { throw new Error("DB_MISSING") }
+    },
+    watchlist: {
+      create: async () => { throw new Error("DB_MISSING") }
+    },
+    comment: {
+      findMany: async () => [],
+      create: async () => { throw new Error("DB_MISSING") }
     }
   };
 }
@@ -83,6 +91,78 @@ app.get("/api/proxy/jikan/*", async (req, res) => {
   }
 });
 
+// Proxy for Consumet (Anime & K-Drama)
+app.get("/api/proxy/consumet/*", async (req, res) => {
+  try {
+    const subPath = req.params[0];
+    const query = new URLSearchParams(req.query as any).toString();
+    
+    // Try multiple instances if one fails
+    const instances = [
+      "https://consumet-api-omega.vercel.app",
+      "https://consumet-api-reborn.vercel.app",
+      "https://consumet-api-2.vercel.app",
+      "https://api.consumet.org",
+      "https://consumet-api-production.up.railway.app"
+    ];
+    
+    let lastError = null;
+    for (const base of instances) {
+      try {
+        const url = `${base}/${subPath}${query ? "?" + query : ""}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout per instance
+
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "application/json"
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          throw new Error(`Instance ${base} returned ${response.status}`);
+        }
+
+        const contentType = response.headers.get("content-type") || "application/octet-stream";
+        
+        if (contentType.includes("application/json")) {
+          const data = await response.json();
+          return res.status(response.status).json(data);
+        } else {
+          // If we expected JSON but got something else, it's a failure for this instance
+          if (subPath.includes("info") || subPath.includes("watch") || subPath.includes("trending") || subPath.includes("popular") || subPath.includes("search")) {
+             throw new Error(`Instance ${base} returned non-JSON content (${contentType}) for API call`);
+          }
+
+          // For non-JSON content (like video segments, images, etc.), pipe the response
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          // Log the first 100 chars if it looks like text but isn't JSON
+          if (contentType.includes("text") || contentType.includes("javascript")) {
+            console.warn(`Non-JSON response from ${base} (${contentType}):`, buffer.toString().substring(0, 100));
+          }
+          
+          res.setHeader("Content-Type", contentType);
+          return res.status(response.status).send(buffer);
+        }
+      } catch (err) {
+        console.warn(`Consumet instance ${base} failed:`, err instanceof Error ? err.message : err);
+        lastError = err;
+        continue; // Try next instance
+      }
+    }
+    
+    throw lastError || new Error("All Consumet instances failed");
+  } catch (error) {
+    console.error("Consumet Proxy Final Error:", error);
+    res.status(500).json({ error: "Failed to fetch from Consumet", details: error instanceof Error ? error.message : "Unknown error" });
+  }
+});
+
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", env: process.env.NODE_ENV });
 });
@@ -120,7 +200,22 @@ router.post("/auth/register", async (req, res) => {
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
       user = await prisma.user.create({
-        data: { email, password: hashedPassword, name, role },
+        data: { 
+          email, 
+          password: hashedPassword, 
+          name, 
+          role,
+          isVerified: role === "OWNER"
+        },
+      });
+      
+      // Create default subscription
+      await prisma.subscription.create({
+        data: {
+          userId: user.id,
+          plan: role === "OWNER" ? "PREMIUM" : "FREE",
+          status: "ACTIVE"
+        }
       });
     } catch (dbError) {
       console.warn("Prisma failed, using mock storage:", dbError);
@@ -128,7 +223,7 @@ router.post("/auth/register", async (req, res) => {
       mockUsers.push({ ...user, password }); 
     }
     
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role, isVip: user.isVip } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role, isVip: user.isVip || role === "OWNER" } });
   } catch (error) {
     console.error("Register error:", error);
     res.status(400).json({ error: "User already exists or invalid data" });
@@ -147,10 +242,14 @@ router.post("/auth/login", async (req, res) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ 
+      where: { email },
+      include: { subscription: true }
+    });
     if (user && user.password && (await bcrypt.compare(password, user.password))) {
       const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET);
-      return res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, isVip: user.role === "VIP" || user.role === "OWNER" } });
+      const isVip = user.role === "VIP" || user.role === "OWNER" || user.subscription?.plan === "PREMIUM";
+      return res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, isVip } });
     }
   } catch (dbError) {
     console.warn("Prisma login failed, checking mock storage");
@@ -232,12 +331,21 @@ app.use("/api", router);
 
 // --- VITE MIDDLEWARE ---
 async function startServer() {
-  if (process.env.NODE_ENV !== "production") {
+  const isProd = process.env.NODE_ENV === "production";
+  
+  if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
+  } else {
+    // In production, serve static files from dist
+    app.use(express.static(path.join(process.cwd(), "dist")));
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api")) return next();
+      res.sendFile(path.join(process.cwd(), "dist/index.html"));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
@@ -245,8 +353,9 @@ async function startServer() {
   });
 }
 
-if (process.env.NODE_ENV !== "production") {
-  startServer();
-}
+// Always start the server when this file is run directly
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
+});
 
 export default app;

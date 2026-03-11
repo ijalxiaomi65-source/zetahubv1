@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { fetchDetails } from "../lib/api";
 import { Play, Plus, Star, Calendar, Clock, Tv } from "lucide-react";
 import { motion } from "framer-motion";
+import { Skeleton } from "../components/Skeleton";
+import { LoadingBar } from "../components/LoadingBar";
 
 export default function Details() {
   const { id } = useParams();
@@ -14,6 +16,7 @@ export default function Details() {
     const load = async () => {
       if (id) {
         try {
+          setLoading(true);
           const data = await fetchDetails(id);
           setAnime(data);
         } catch (err: any) {
@@ -26,7 +29,6 @@ export default function Details() {
     load();
   }, [id]);
 
-  if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
   if (error) return (
     <div className="h-screen flex flex-col items-center justify-center gap-4">
       <p className="text-red-500 font-bold">{error}</p>
@@ -38,10 +40,36 @@ export default function Details() {
       </button>
     </div>
   );
+
+  if (loading && !anime) {
+    return (
+      <div className="relative">
+        <LoadingBar isLoading={loading} />
+        <div className="h-[60vh] bg-white/5 animate-pulse" />
+        <div className="max-w-7xl mx-auto px-6 sm:px-12 -mt-40 relative z-10">
+          <div className="flex flex-col md:flex-row gap-12">
+            <Skeleton className="w-full md:w-72 aspect-[2/3] rounded-2xl" />
+            <div className="flex-grow pt-20 space-y-6">
+              <Skeleton className="h-12 w-3/4" />
+              <Skeleton className="h-6 w-1/2" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-20 rounded-full" />
+                <Skeleton className="h-8 w-20 rounded-full" />
+                <Skeleton className="h-8 w-20 rounded-full" />
+              </div>
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!anime) return <div className="h-screen flex items-center justify-center">Anime not found</div>;
 
   return (
     <div className="relative">
+      <LoadingBar isLoading={loading} />
       {/* Banner */}
       <div className="h-[60vh] relative overflow-hidden">
         <img 

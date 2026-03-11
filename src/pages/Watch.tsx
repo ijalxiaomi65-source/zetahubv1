@@ -1,42 +1,84 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { fetchDetails } from "../lib/api";
-import { Play, SkipForward, Settings, Maximize, Volume2, List, MessageSquare, Send, Crown, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { fetchDetails, fetchAnimeEpisodes, fetchStreamSources } from "../lib/api";
+import { Play, SkipForward, Settings, Maximize, Volume2, List, MessageSquare, Send, Crown, X, CheckCircle2, AlertCircle, ArrowLeft, Star } from "lucide-react";
+import { Skeleton } from "../components/Skeleton";
+import { LoadingBar } from "../components/LoadingBar";
+import { VideoPlayer } from "../components/VideoPlayer";
 
 export default function Watch() {
   const { id, episode } = useParams();
   const navigate = useNavigate();
   const [anime, setAnime] = useState<any>(null);
+  const [episodes, setEpisodes] = useState<any[]>([]);
+  const [streamData, setStreamData] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [server, setServer] = useState(1);
+  const [server, setServer] = useState(0); // Index of source
   const [isVip, setIsVip] = useState(false);
   const [showVipModal, setShowVipModal] = useState(false);
   const [showAd, setShowAd] = useState(false);
   const [adTimer, setAdTimer] = useState(15);
-  const [videosWatched, setVideosWatched] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  // Load saved progress
+  useEffect(() => {
+    if (id && episode) {
+      const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
+      const saved = history.find((h: any) => h.animeId === id && h.episode === parseInt(episode));
+      if (saved) {
+        setCurrentTime(saved.timestamp || 0);
+      }
+    }
+  }, [id, episode]);
+
+  // Heartbeat to save progress
+  useEffect(() => {
+    if (!loading && anime && id && episode) {
+      const interval = setInterval(() => {
+        setCurrentTime(prev => {
+          const next = prev + 5;
+          
+          // Save to localStorage
+          const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
+          const existingIndex = history.findIndex((h: any) => h.animeId === id);
+          
+          const entry = {
+            animeId: id,
+            animeTitle: anime.title.english || anime.title.romaji || anime.title.native,
+            animeCover: anime.coverImage.large || anime.coverImage.extraLarge,
+            episode: parseInt(episode),
+            timestamp: next,
+            duration: (anime.duration || 24) * 60,
+            updatedAt: Date.now()
+          };
+
+          if (existingIndex > -1) {
+            history[existingIndex] = entry;
+          } else {
+            history.unshift(entry);
+          }
+
+          localStorage.setItem("watchHistory", JSON.stringify(history.slice(0, 10)));
+          return next;
+        });
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [loading, anime, id, episode]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    // Owner Zeta is always VIP
     const isOwner = user.name === "Zeta" || user.role === "OWNER";
     setIsVip(user.isVip || isOwner || false);
-    
-    if (isOwner) {
-      user.isVip = true;
-      user.role = "OWNER";
-      localStorage.setItem("user", JSON.stringify(user));
-    }
-    
-    // Check if we need to show an ad
+
     if (!user.isVip && !isOwner) {
       const watched = parseInt(localStorage.getItem("videosWatched") || "0");
       if (watched >= 3) {
         setShowAd(true);
         setAdTimer(15);
-      } else {
-        setVideosWatched(watched);
       }
     }
   }, [id, episode]);
@@ -51,52 +93,58 @@ export default function Watch() {
     return () => clearInterval(timer);
   }, [showAd, adTimer]);
 
-  useEffect(() => {
-    const load = async () => {
-      if (id) {
-        setLoading(true);
-        const data = await fetchDetails(id);
-        setAnime(data);
-        
-        // Fetch comments
-        try {
-          const res = await fetch(`/api/comments/${id}-${episode}`);
-          if (res.ok) {
-            const data = await res.json();
-            setComments(data);
-          }
-        } catch (e) {
-          console.error("Comments fetch error:", e);
-        }
-        
-        setLoading(false);
-      }
-    };
-    load();
-  }, [id, episode]);
-
   const handleSkipAd = () => {
     if (adTimer === 0) {
       setShowAd(false);
       localStorage.setItem("videosWatched", "0");
-      setVideosWatched(0);
     }
   };
 
   const handleVideoStart = () => {
     if (!isVip) {
       const currentWatched = parseInt(localStorage.getItem("videosWatched") || "0");
-      const newCount = currentWatched + 1;
-      
-      if (newCount >= 3) {
-        setShowAd(true);
-        setAdTimer(15);
-        localStorage.setItem("videosWatched", "0");
-        setVideosWatched(0);
-      } else {
-        setVideosWatched(newCount);
-        localStorage.setItem("videosWatched", newCount.toString());
+      localStorage.setItem("videosWatched", (currentWatched + 1).toString());
+    }
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      if (id && episode) {
+        setLoading(true);
+        try {
+          const [details, eps] = await Promise.all([
+            fetchDetails(id),
+            fetchAnimeEpisodes(id)
+          ]);
+          setAnime(details);
+          setEpisodes(eps);
+          
+          const currentEp = eps.find((e: any) => e.number === parseInt(episode));
+          if (currentEp) {
+            const sources = await fetchStreamSources(currentEp.id);
+            setStreamData(sources);
+          }
+
+          // Fetch comments
+          const res = await fetch(`/api/comments/${id}-${episode}`);
+          if (res.ok) {
+            const data = await res.json();
+            setComments(data);
+          }
+        } catch (e) {
+          console.error("Watch load error:", e);
+        } finally {
+          setLoading(false);
+        }
       }
+    };
+    load();
+  }, [id, episode]);
+
+  const handleAutoNext = () => {
+    const nextEp = parseInt(episode || "1") + 1;
+    if (nextEp <= (anime?.episodes || episodes.length)) {
+      navigate(`/watch/${id}/${nextEp}`);
     }
   };
 
@@ -112,40 +160,34 @@ export default function Watch() {
     alert("VIP Activated! Enjoy ad-free streaming on ZetaHub.");
   };
 
-  const handleCommentSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-    
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (!user.id) return alert("Please login to comment");
-
-    try {
-      const res = await fetch("/api/comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          episodeId: `${id}-${episode}`,
-          content: newComment
-        }),
-      });
-      if (res.ok) {
-        const comment = await res.json();
-        setComments([comment, ...comments]);
-        setNewComment("");
-      }
-    } catch (e) {
-      console.error("Comment submit error:", e);
-    }
+  const handleRating = (score: number) => {
+    alert(`You rated this episode ${score}/5 stars!`);
   };
 
-  if (loading) return <div className="h-screen flex items-center justify-center">Loading Player...</div>;
+  if (loading && !anime) {
+    return (
+      <div className="pt-24 px-6 max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <LoadingBar isLoading={loading} />
+        <div className="lg:col-span-3 space-y-6">
+          <Skeleton className="aspect-video rounded-2xl" />
+          <Skeleton className="h-12 w-1/2" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+        <div className="space-y-6">
+          <Skeleton className="h-[600px] w-full rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
 
-  const hasTrailer = anime.trailer && anime.trailer.site === "youtube";
-  const relations = anime.relations?.edges?.filter((e: any) => e.node.type === "ANIME") || [];
+  if (!anime) return <div className="h-screen flex items-center justify-center">Anime not found</div>;
+
+  const currentSource = streamData?.sources?.[server] || streamData?.sources?.[0];
 
   return (
     <div className="pt-24 px-6 max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <LoadingBar isLoading={loading} />
+      
       {/* Ad Modal */}
       {showAd && (
         <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex items-center justify-center p-6">
@@ -231,7 +273,6 @@ export default function Watch() {
                 >
                   ACTIVATE VIP NOW
                 </button>
-                <p className="text-[10px] text-white/20 uppercase tracking-widest font-bold">Cancel anytime • Secure payment</p>
               </div>
             </div>
           </div>
@@ -239,84 +280,44 @@ export default function Watch() {
       )}
 
       <div className="lg:col-span-3 space-y-6">
-        {/* Video Player */}
-        <div key={`${id}-${episode}-${server}`} className="aspect-video bg-black rounded-2xl overflow-hidden relative group border border-white/10 shadow-2xl">
-          {/* Status Badges */}
-          <div className="absolute top-4 left-4 z-10 flex gap-2">
-            <span className="bg-primary text-black text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg">
-              Episode {episode}
-            </span>
-            <span className="bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-white/10 shadow-lg">
-              Server {server}
-            </span>
-            {isVip && (
-              <span className="bg-amber-500 text-black text-[10px] font-black px-2 py-1 rounded uppercase tracking-widest shadow-lg flex items-center gap-1">
-                <Crown size={10} /> VIP
-              </span>
+        {/* Video Player Section */}
+        <div className="space-y-4">
+          <div className="aspect-video bg-black rounded-2xl overflow-hidden relative group border border-white/10 shadow-2xl">
+            {currentSource ? (
+              <VideoPlayer 
+                src={currentSource.url} 
+                poster={anime.bannerImage || anime.coverImage.extraLarge}
+                onEnded={handleAutoNext}
+                onPlay={handleVideoStart}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-center p-12">
+                <AlertCircle size={48} className="text-red-500 mb-4" />
+                <h2 className="text-2xl font-black tracking-tighter">Stream Unavailable</h2>
+                <p className="text-white/60 text-sm max-w-md mt-2">We're having trouble loading this episode. Please try switching servers or check back later.</p>
+              </div>
             )}
           </div>
 
-          {server === 1 && hasTrailer ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${anime.trailer.id}?autoplay=1&modestbranding=1&rel=0&showinfo=0`}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title="Anime Player"
-              onLoad={handleVideoStart}
-            />
-          ) : (
-            <div className="w-full h-full relative flex flex-col items-center justify-center text-center p-12">
-              <img 
-                src={anime.bannerImage || anime.coverImage.extraLarge} 
-                className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm"
-                alt="Background"
-              />
-              <div className="relative z-10 space-y-6 max-w-md">
-                <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto border border-primary/40">
-                  <Play size={40} className="text-primary" />
-                </div>
-                <h2 className="text-2xl font-black tracking-tighter">
-                  Server {server} Active
-                </h2>
-                <p className="text-white/60 text-sm leading-relaxed">
-                  {server >= 3 
-                    ? `You are connected to Server ${server}. Enjoy high-speed streaming with optimized buffering.`
-                    : `Streaming from Server ${server}. Quality is automatically adjusted based on your connection.`
-                  }
-                </p>
-                <div className="flex gap-4 justify-center">
-                  <button onClick={() => setServer(1)} className="bg-white/10 hover:bg-white/20 px-6 py-3 rounded-xl text-sm font-bold transition-all border border-white/10">
-                    Switch to Main
-                  </button>
-                  {!isVip && (
-                    <button onClick={() => setShowVipModal(true)} className="bg-primary text-black px-6 py-3 rounded-xl text-sm font-bold hover:scale-105 transition-all shadow-lg shadow-primary/20">
-                      Upgrade for 4K
-                    </button>
-                  )}
-                </div>
+          {/* Server Switcher */}
+          {streamData?.sources && streamData.sources.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 glass-card p-4">
+              <span className="text-xs font-black uppercase tracking-widest text-muted ml-2">Available Qualities:</span>
+              {streamData.sources.map((s: any, idx: number) => (
+                <button 
+                  key={idx}
+                  onClick={() => setServer(idx)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${server === idx ? "bg-primary text-black border-primary scale-105 shadow-lg shadow-primary/20" : "bg-white/5 border-white/10 text-muted hover:bg-white/10"}`}
+                >
+                  {s.quality || "Auto"}
+                </button>
+              ))}
+              <div className="ml-auto flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted">All Servers Online</span>
               </div>
             </div>
           )}
-        </div>
-
-        {/* Server Switcher */}
-        <div className="flex flex-wrap items-center gap-4 glass-card p-4">
-          <span className="text-xs font-black uppercase tracking-widest text-muted ml-2">Available Servers:</span>
-          {[1, 2, 3, 4, 5].map((s) => (
-            <button 
-              key={s}
-              onClick={() => setServer(s)}
-              className={`px-6 py-3 rounded-xl text-xs font-black transition-all border flex items-center gap-2 ${server === s ? "bg-primary text-black border-primary scale-105 shadow-lg shadow-primary/20" : "bg-white/5 border-white/10 text-muted hover:bg-white/10"}`}
-            >
-              Server {s} {s === 3 && <span className="text-[8px] bg-black/20 px-1 rounded">FAST</span>}
-              {s === 5 && <span className="text-[8px] bg-black/20 px-1 rounded">HD</span>}
-            </button>
-          ))}
-          <div className="ml-auto flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-muted">All Servers Online</span>
-          </div>
         </div>
 
         {/* Info */}
@@ -327,7 +328,7 @@ export default function Watch() {
             </h1>
             <div className="flex items-center gap-4">
               <p className="text-muted text-sm font-medium uppercase tracking-widest">
-                Now Streaming • 1080p • Subbed
+                Now Streaming • {currentSource?.quality || "HD"} • Subbed
               </p>
               <div className="h-1 w-1 rounded-full bg-white/20" />
               <p className="text-primary text-sm font-bold uppercase tracking-widest">
@@ -336,6 +337,17 @@ export default function Watch() {
             </div>
           </div>
           <div className="flex gap-4">
+            <div className="flex items-center gap-1 bg-white/5 p-2 rounded-xl border border-white/10">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button 
+                  key={star} 
+                  onClick={() => handleRating(star)}
+                  className="text-white/20 hover:text-yellow-500 transition-all"
+                >
+                  <Star size={18} />
+                </button>
+              ))}
+            </div>
             <button className="glass-card p-3 hover:bg-white/10 transition-all">
               <MessageSquare size={20} />
             </button>
@@ -345,50 +357,21 @@ export default function Watch() {
           </div>
         </div>
 
-        {/* Seasons / Relations */}
-        {relations.length > 0 && (
-          <div className="space-y-6 pt-6">
-            <h3 className="text-xl font-black tracking-tighter flex items-center gap-3">
-              Other Seasons <span className="text-xs font-normal text-white/40 bg-white/5 px-2 py-0.5 rounded">{relations.length}</span>
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {relations.map((rel: any) => (
-                <Link 
-                  key={rel.node.id} 
-                  to={`/anime/${rel.node.id}`}
-                  className="group space-y-3"
-                >
-                  <div className="aspect-[3/4] rounded-xl overflow-hidden border border-white/10 relative">
-                    <img 
-                      src={rel.node.coverImage.large} 
-                      alt={rel.node.title.english} 
-                      className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500"
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                      <Play size={32} className="text-primary" />
-                    </div>
-                    <div className="absolute top-2 left-2">
-                      <span className="bg-black/60 backdrop-blur-md text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest border border-white/10">
-                        {rel.relationType.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs font-bold line-clamp-1 group-hover:text-primary transition-all">
-                    {rel.node.title.english || rel.node.title.romaji}
-                  </p>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Description */}
+        <div className="glass-card p-8">
+          <p className="text-white/60 text-sm leading-relaxed line-clamp-3 hover:line-clamp-none transition-all cursor-pointer" dangerouslySetInnerHTML={{ __html: anime.description }} />
+        </div>
 
         {/* Comments Section */}
         <div className="pt-12 space-y-8">
           <h3 className="text-2xl font-black tracking-tighter flex items-center gap-3">
-            Comments <span className="text-sm font-normal text-white/40 bg-white/5 px-2 py-0.5 rounded">124</span>
+            Comments <span className="text-sm font-normal text-white/40 bg-white/5 px-2 py-0.5 rounded">{comments.length}</span>
           </h3>
           
-          <form onSubmit={handleCommentSubmit} className="relative">
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            // Handle comment submit
+          }} className="relative">
             <textarea 
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -401,32 +384,22 @@ export default function Watch() {
           </form>
 
           <div className="space-y-6">
-            {comments.length > 0 ? (
-              comments.map((comment: any) => (
-                <div key={comment.id} className="flex gap-4 p-6 rounded-2xl bg-white/5 border border-white/5">
-                  <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
-                    <span className="text-primary font-bold">{comment.user?.name?.[0] || "?"}</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold">{comment.user?.name || "Anonymous"}</span>
-                      {comment.user?.role === "VIP" && (
-                        <span className="bg-primary text-black text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest">VIP</span>
-                      )}
-                      <span className="text-white/20 text-xs">
-                        {new Date(comment.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="text-white/70 leading-relaxed">{comment.content}</p>
-                  </div>
+            {comments.map((comment: any) => (
+              <div key={comment.id} className="flex gap-4 p-6 rounded-2xl bg-white/5 border border-white/5">
+                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
+                  <span className="text-primary font-bold">{comment.user?.name?.[0] || "?"}</span>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-12 bg-white/5 rounded-2xl border border-white/5 border-dashed">
-                <MessageSquare size={48} className="mx-auto text-white/10 mb-4" />
-                <p className="text-white/40 font-bold">No comments yet. Be the first to start the conversation!</p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">{comment.user?.name || "Anonymous"}</span>
+                    <span className="text-white/20 text-xs">
+                      {new Date(comment.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-white/70 leading-relaxed">{comment.content}</p>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
@@ -438,20 +411,36 @@ export default function Watch() {
             Episodes <List size={18} className="text-primary" />
           </h3>
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
-            {Array.from({ length: anime.episodes || 12 }).map((_, i) => (
-              <Link 
-                key={i} 
-                to={`/watch/${anime.id}/${i + 1}`}
-                className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${parseInt(episode || "1") === i + 1 ? "bg-primary border-primary text-black" : "bg-white/5 border-white/5 hover:bg-white/10"}`}
-              >
-                <span className={`text-lg font-black italic ${parseInt(episode || "1") === i + 1 ? "text-black/40" : "text-white/20"}`}>{(i + 1).toString().padStart(2, '0')}</span>
-                <div className="flex-grow">
-                  <p className="font-bold text-sm">Episode {i + 1}</p>
-                  <p className={`text-[10px] uppercase font-bold tracking-widest ${parseInt(episode || "1") === i + 1 ? "text-black/60" : "text-white/30"}`}>24:00</p>
-                </div>
-                {parseInt(episode || "1") === i + 1 && <Play size={14} fill="currentColor" />}
-              </Link>
-            ))}
+            {episodes.length > 0 ? (
+              episodes.map((ep: any) => (
+                <Link 
+                  key={ep.id} 
+                  to={`/watch/${id}/${ep.number}`}
+                  className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${parseInt(episode || "1") === ep.number ? "bg-primary border-primary text-black" : "bg-white/5 border-white/5 hover:bg-white/10"}`}
+                >
+                  <span className={`text-lg font-black italic ${parseInt(episode || "1") === ep.number ? "text-black/40" : "text-white/20"}`}>{ep.number.toString().padStart(2, '0')}</span>
+                  <div className="flex-grow">
+                    <p className="font-bold text-sm line-clamp-1">{ep.title || `Episode ${ep.number}`}</p>
+                    <p className={`text-[10px] uppercase font-bold tracking-widest ${parseInt(episode || "1") === ep.number ? "text-black/60" : "text-white/30"}`}>24:00</p>
+                  </div>
+                  {parseInt(episode || "1") === ep.number && <Play size={14} fill="currentColor" />}
+                </Link>
+              ))
+            ) : (
+              Array.from({ length: anime.episodes || 12 }).map((_, i) => (
+                <Link 
+                  key={i} 
+                  to={`/watch/${id}/${i + 1}`}
+                  className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${parseInt(episode || "1") === i + 1 ? "bg-primary border-primary text-black" : "bg-white/5 border-white/5 hover:bg-white/10"}`}
+                >
+                  <span className={`text-lg font-black italic ${parseInt(episode || "1") === i + 1 ? "text-black/40" : "text-white/20"}`}>{(i + 1).toString().padStart(2, '0')}</span>
+                  <div className="flex-grow">
+                    <p className="font-bold text-sm">Episode {i + 1}</p>
+                    <p className={`text-[10px] uppercase font-bold tracking-widest ${parseInt(episode || "1") === i + 1 ? "text-black/60" : "text-white/30"}`}>24:00</p>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
         </div>
 
