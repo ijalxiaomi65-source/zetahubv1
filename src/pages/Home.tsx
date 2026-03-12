@@ -93,7 +93,7 @@ export default function Home() {
           <>
             <div className="absolute inset-0 z-0">
               <img 
-                src={trending[0].bannerImage || trending[0].coverImage.extraLarge} 
+                src={trending[0].bannerImage || trending[0].coverImage.extraLarge || null} 
                 className="w-full h-full object-cover opacity-40 scale-105 animate-slow-zoom"
                 alt="Hero"
               />
@@ -151,7 +151,7 @@ export default function Home() {
                   className="glass-card group flex gap-4 p-4 hover:border-primary/50 transition-all"
                 >
                   <div className="w-24 aspect-[2/3] rounded-xl overflow-hidden shrink-0">
-                    <img src={item.animeCover} className="w-full h-full object-cover" alt={item.animeTitle} />
+                    <img src={item.animeCover || null} className="w-full h-full object-cover" alt={item.animeTitle} />
                   </div>
                   <div className="flex flex-col justify-between py-1">
                     <div className="space-y-1">
@@ -189,7 +189,7 @@ export default function Home() {
                 <motion.div key={item.id} whileHover={{ scale: 1.05 }} className="group">
                   <Link to={`/anime/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.coverImage.large} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title.english} />
+                      <img src={item.coverImage.large || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title.english} />
                       <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-black border border-white/10 flex items-center gap-1">
                         <Star size={10} className="text-yellow-500" fill="currentColor" />
                         {item.averageScore / 10}
@@ -224,7 +224,7 @@ export default function Home() {
                 <motion.div key={item.id} whileHover={{ scale: 1.05 }} className="group">
                   <Link to={`/kdrama/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
+                      <img src={item.image || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
                       <div className="absolute bottom-3 left-3 bg-primary text-black text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest">
                         NEW EPISODE
                       </div>
@@ -263,7 +263,7 @@ export default function Home() {
                   className="aspect-[3/4] rounded-xl overflow-hidden bg-white/5 border border-white/10 group relative"
                 >
                   <img 
-                    src={img.image?.compressed?.url || img.image?.original?.url || ""} 
+                    src={img.image?.compressed?.url || img.image?.original?.url || null} 
                     className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" 
                     alt="Gallery Preview"
                     referrerPolicy="no-referrer"
@@ -292,7 +292,7 @@ export default function Home() {
                 <motion.div key={item.id} whileHover={{ scale: 1.05 }} className="group">
                   <Link to={`/anime/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.coverImage.large} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title.english} />
+                      <img src={item.coverImage.large || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title.english} />
                     </div>
                     <div className="mt-4 space-y-1">
                       <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title.english || item.title.romaji || item.title.native}</h3>

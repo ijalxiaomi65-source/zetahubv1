@@ -74,7 +74,7 @@ export default function KdramaDetails() {
       {/* Banner */}
       <div className="h-[60vh] relative overflow-hidden">
         <img 
-          src={drama.image} 
+          src={drama.image || null} 
           className="w-full h-full object-cover opacity-30 blur-sm scale-110"
           alt="Banner"
         />
@@ -90,7 +90,7 @@ export default function KdramaDetails() {
             className="w-full md:w-80 shrink-0"
           >
             <div className="aspect-[2/3] rounded-3xl overflow-hidden border-4 border-white/10 shadow-2xl relative group">
-              <img src={drama.image} className="w-full h-full object-cover" alt={drama.title} />
+              <img src={drama.image || null} className="w-full h-full object-cover" alt={drama.title} />
               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
                 <Play size={64} className="text-primary" />
               </div>

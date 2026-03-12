@@ -150,7 +150,7 @@ export default function Gallery() {
                 className="group relative aspect-[3/4] rounded-2xl overflow-hidden bg-white/5 border border-white/10"
               >
                 <img 
-                  src={img.image?.compressed?.url || img.image?.original?.url || ""} 
+                  src={img.image?.compressed?.url || img.image?.original?.url || null} 
                   alt={img.anime?.character || "Anime Image"}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   referrerPolicy="no-referrer"

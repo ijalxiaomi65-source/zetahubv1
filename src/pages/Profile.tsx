@@ -137,7 +137,7 @@ export default function Profile() {
                       to={`/watch/${item.animeId}/${item.episode}`}
                       className="group relative aspect-video rounded-2xl overflow-hidden border border-white/10"
                     >
-                      <img src={item.animeCover} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt={item.animeTitle} />
+                      <img src={item.animeCover || null} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt={item.animeTitle} />
                       <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <h4 className="font-bold line-clamp-1">{item.animeTitle}</h4>

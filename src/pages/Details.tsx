@@ -73,7 +73,7 @@ export default function Details() {
       {/* Banner */}
       <div className="h-[60vh] relative overflow-hidden">
         <img 
-          src={anime.bannerImage || anime.coverImage.extraLarge} 
+          src={anime.bannerImage || anime.coverImage.extraLarge || null} 
           className="w-full h-full object-cover"
           alt={anime.title.english}
         />
@@ -89,7 +89,7 @@ export default function Details() {
             className="w-full md:w-72 shrink-0"
           >
             <div className="aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-              <img src={anime.coverImage.extraLarge} className="w-full h-full object-cover" alt={anime.title.english} />
+              <img src={anime.coverImage.extraLarge || null} className="w-full h-full object-cover" alt={anime.title.english} />
             </div>
             
             <div className="mt-8 space-y-4">
@@ -164,7 +164,7 @@ export default function Details() {
                     {anime.characters.nodes.map((char: any) => (
                       <div key={char.id} className="space-y-2 text-center">
                         <div className="aspect-square rounded-full overflow-hidden border border-white/10">
-                          <img src={char.image.large} className="w-full h-full object-cover" alt={char.name.full} />
+                          <img src={char.image.large || null} className="w-full h-full object-cover" alt={char.name.full} />
                         </div>
                         <p className="text-[10px] font-bold line-clamp-1">{char.name.full}</p>
                       </div>
@@ -189,7 +189,7 @@ export default function Details() {
                 >
                   <div className="aspect-[3/4] rounded-xl overflow-hidden border border-white/10 relative">
                     <img 
-                      src={rel.node.coverImage.large} 
+                      src={rel.node.coverImage.large || null} 
                       alt={rel.node.title.english} 
                       className="w-full h-full object-cover group-hover:scale-110 transition-all duration-500"
                     />

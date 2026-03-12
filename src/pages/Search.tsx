@@ -61,7 +61,7 @@ export default function Search() {
             >
               <Link to={`/anime/${item.mal_id}`}>
                 <div className="aspect-[2/3] rounded-xl overflow-hidden bg-white/5 border border-white/10 relative">
-                  <img src={item.images.jpg.large_image_url} className="w-full h-full object-cover" alt={item.title} />
+                  <img src={item.images?.jpg?.large_image_url || null} className="w-full h-full object-cover" alt={item.title} />
                   <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md flex items-center gap-1 text-[10px] font-bold">
                     <Star size={10} className="text-yellow-500 fill-yellow-500" />
                     {item.score || "N/A"}

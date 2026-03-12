@@ -99,11 +99,12 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
     
     // Try multiple instances if one fails
     const instances = [
-      "https://consumet-api-omega.vercel.app",
-      "https://consumet-api-reborn.vercel.app",
-      "https://consumet-api-2.vercel.app",
-      "https://api.consumet.org",
-      "https://consumet-api-production.up.railway.app"
+      "https://consumet-api-production-e65a.up.railway.app",
+      "https://consumet-api-five.vercel.app",
+      "https://consumet-api-one.vercel.app",
+      "https://consumet-api-three.vercel.app",
+      "https://consumet-api-clone.vercel.app",
+      "https://api.consumet.org"
     ];
     
     let lastError = null;
@@ -111,12 +112,14 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
       try {
         const url = `${base}/${subPath}${query ? "?" + query : ""}`;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000); // 8s timeout per instance
+        const timeout = setTimeout(() => controller.abort(), 6000); // 6s timeout per instance
 
         const response = await fetch(url, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "application/json"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Origin": base,
+            "Referer": base
           },
           signal: controller.signal
         });
@@ -141,12 +144,8 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
           const arrayBuffer = await response.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           
-          // Log the first 100 chars if it looks like text but isn't JSON
-          if (contentType.includes("text") || contentType.includes("javascript")) {
-            console.warn(`Non-JSON response from ${base} (${contentType}):`, buffer.toString().substring(0, 100));
-          }
-          
           res.setHeader("Content-Type", contentType);
+          res.setHeader("Cache-Control", "public, max-age=3600");
           return res.status(response.status).send(buffer);
         }
       } catch (err) {
@@ -339,23 +338,18 @@ async function startServer() {
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
-    // In production, serve static files from dist
-    app.use(express.static(path.join(process.cwd(), "dist")));
-    app.get("*", (req, res, next) => {
-      if (req.path.startsWith("/api")) return next();
-      res.sendFile(path.join(process.cwd(), "dist/index.html"));
+    
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`ZetaHub Dev Server running on http://localhost:${PORT}`);
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ZetaHub Server running on http://localhost:${PORT}`);
-  });
 }
 
-// Always start the server when this file is run directly
-startServer().catch(err => {
-  console.error("Failed to start server:", err);
-});
+// Only start the server in development
+if (process.env.NODE_ENV !== "production") {
+  startServer().catch(err => {
+    console.error("Failed to start server:", err);
+  });
+}
 
 export default app;
