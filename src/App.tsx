@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
@@ -12,8 +12,31 @@ import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import Admin from "./pages/Admin";
+import HumanVerification from "./components/HumanVerification";
 
 export default function App() {
+  const [isVerified, setIsVerified] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const verified = sessionStorage.getItem("human_verified");
+    if (verified === "true") {
+      setIsVerified(true);
+    }
+    setChecking(false);
+  }, []);
+
+  const handleVerify = () => {
+    sessionStorage.setItem("human_verified", "true");
+    setIsVerified(true);
+  };
+
+  if (checking) return null;
+
+  if (!isVerified) {
+    return <HumanVerification onVerify={handleVerify} />;
+  }
+
   return (
     <Router>
       <div className="min-h-screen flex flex-col">

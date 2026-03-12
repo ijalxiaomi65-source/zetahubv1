@@ -1,35 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, User, Crown, LogOut, Menu, X, Sun, Moon } from "lucide-react";
+import { Search, User, Crown, LogOut, Sun, Moon } from "lucide-react";
+import { useStore } from "../store/useStore";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+  const { user, theme, setTheme, logout } = useStore();
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     
-    const storedUser = localStorage.getItem("user");
-    if (storedUser) setUser(JSON.parse(storedUser));
-
     document.documentElement.setAttribute("data-theme", theme);
     
     return () => window.removeEventListener("scroll", handleScroll);
   }, [theme]);
 
   const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    setUser(null);
+    logout();
     navigate("/login");
   };
 
@@ -67,8 +60,12 @@ export default function Navbar() {
           {user ? (
             <div className="flex items-center gap-4">
               <Link to="/profile" className="flex items-center gap-2 group">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 group-hover:border-primary transition-all">
-                  <User size={16} className="text-primary" />
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 group-hover:border-primary transition-all overflow-hidden">
+                  {user.image ? (
+                    <img src={user.image} className="w-full h-full object-cover" alt="Avatar" />
+                  ) : (
+                    <User size={16} className="text-primary" />
+                  )}
                 </div>
                 <span className="text-sm font-medium hidden sm:inline">{user.name}</span>
                 {user.role === "VIP" && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}

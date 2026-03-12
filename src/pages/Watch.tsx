@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { fetchDetails, fetchAnimeEpisodes, fetchStreamSources } from "../lib/api";
+import { fetchDetails, fetchAnimeEpisodes, fetchStreamSources, searchAnimeAcrossProviders } from "../lib/api";
 import { Play, SkipForward, Settings, Maximize, Volume2, List, MessageSquare, Send, Crown, X, CheckCircle2, AlertCircle, ArrowLeft, Star } from "lucide-react";
 import { Skeleton } from "../components/Skeleton";
 import { LoadingBar } from "../components/LoadingBar";
@@ -15,7 +15,9 @@ export default function Watch() {
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [server, setServer] = useState(0); // Index of source
+  const [server, setServer] = useState(0); // Index of source in current provider
+  const [provider, setProvider] = useState("anilist");
+  const [availableProviders, setAvailableProviders] = useState<any>({});
   const [isVip, setIsVip] = useState(false);
   const [showVipModal, setShowVipModal] = useState(false);
   const [showAd, setShowAd] = useState(false);
@@ -112,16 +114,19 @@ export default function Watch() {
       if (id && episode) {
         setLoading(true);
         try {
-          const [details, eps] = await Promise.all([
-            fetchDetails(id),
-            fetchAnimeEpisodes(id)
-          ]);
+          const details = await fetchDetails(id);
           setAnime(details);
+          
+          const title = details.title.english || details.title.romaji || details.title.native;
+          const eps = await fetchAnimeEpisodes(id, title);
           setEpisodes(eps);
+          
+          // Search across providers for fallback
+          searchAnimeAcrossProviders(title).then(setAvailableProviders);
           
           const currentEp = eps.find((e: any) => e.number === parseInt(episode));
           if (currentEp) {
-            const sources = await fetchStreamSources(currentEp.id);
+            const sources = await fetchStreamSources(currentEp.id, provider);
             setStreamData(sources);
           }
 
@@ -140,6 +145,39 @@ export default function Watch() {
     };
     load();
   }, [id, episode]);
+
+  useEffect(() => {
+    const switchProvider = async () => {
+      if (!id || !episode || !episodes.length) return;
+      
+      setLoading(true);
+      try {
+        let epId = "";
+        if (provider === "anilist") {
+          epId = episodes.find((e: any) => e.number === parseInt(episode))?.id;
+        } else if (availableProviders[provider]) {
+          // If we have the ID for this provider, we need to get its episodes
+          const res = await fetch(`/api/proxy/consumet/anime/${provider}/info/${availableProviders[provider].id}`);
+          const data = await res.json();
+          epId = data.episodes?.find((e: any) => e.number === parseInt(episode))?.id;
+        }
+
+        if (epId) {
+          const sources = await fetchStreamSources(epId, provider);
+          setStreamData(sources);
+          setServer(0);
+        } else {
+          setStreamData(null);
+        }
+      } catch (e) {
+        console.error("Provider switch error:", e);
+        setStreamData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    switchProvider();
+  }, [provider, episode]);
 
   const handleAutoNext = () => {
     const nextEp = parseInt(episode || "1") + 1;
@@ -294,30 +332,61 @@ export default function Watch() {
               <div className="w-full h-full flex flex-col items-center justify-center text-center p-12">
                 <AlertCircle size={48} className="text-red-500 mb-4" />
                 <h2 className="text-2xl font-black tracking-tighter">Stream Unavailable</h2>
-                <p className="text-white/60 text-sm max-w-md mt-2">We're having trouble loading this episode. Please try switching servers or check back later.</p>
+                <p className="text-white/60 text-sm max-w-md mt-2">We're having trouble loading this episode on {provider.toUpperCase()}. Please try switching servers or check back later.</p>
+                
+                {/* Fallback YouTube Search for Music Videos */}
+                {anime.format === "MUSIC" && (
+                  <a 
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(anime.title.english || anime.title.romaji) + " MV"}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-6 px-6 py-3 bg-red-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-red-700 transition-all"
+                  >
+                    Watch on YouTube
+                  </a>
+                )}
               </div>
             )}
           </div>
 
           {/* Server Switcher */}
-          {streamData?.sources && streamData.sources.length > 0 && (
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 glass-card p-4">
-              <span className="text-xs font-black uppercase tracking-widest text-muted ml-2">Available Qualities:</span>
-              {streamData.sources.map((s: any, idx: number) => (
+              <span className="text-xs font-black uppercase tracking-widest text-muted ml-2">Select Server:</span>
+              {[
+                { id: "anilist", name: "Server 1", provider: "anilist" },
+                { id: "gogoanime", name: "Server 2", provider: "gogoanime" },
+                { id: "zoro", name: "Server 3", provider: "zoro" },
+                { id: "enime", name: "Server 4", provider: "enime" },
+                { id: "animepahe", name: "Server 5", provider: "animepahe" },
+                { id: "bilibili", name: "Server 6", provider: "bilibili" },
+                { id: "fallback", name: "Server 7", provider: "anilist" },
+              ].map((s) => (
                 <button 
-                  key={idx}
-                  onClick={() => setServer(idx)}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${server === idx ? "bg-primary text-black border-primary scale-105 shadow-lg shadow-primary/20" : "bg-white/5 border-white/10 text-muted hover:bg-white/10"}`}
+                  key={s.id}
+                  onClick={() => setProvider(s.provider)}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${provider === s.provider ? "bg-primary text-black border-primary scale-105 shadow-lg shadow-primary/20" : "bg-white/5 border-white/10 text-muted hover:bg-white/10"}`}
                 >
-                  {s.quality || "Auto"}
+                  {s.name}
                 </button>
               ))}
-              <div className="ml-auto flex items-center gap-2 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted">All Servers Online</span>
-              </div>
             </div>
-          )}
+
+            {streamData?.sources && streamData.sources.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 glass-card p-4">
+                <span className="text-xs font-black uppercase tracking-widest text-muted ml-2">Quality:</span>
+                {streamData.sources.map((s: any, idx: number) => (
+                  <button 
+                    key={idx}
+                    onClick={() => setServer(idx)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${server === idx ? "bg-white text-black border-white" : "bg-white/5 border-white/10 text-muted hover:bg-white/10"}`}
+                  >
+                    {s.quality || "Auto"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Info */}

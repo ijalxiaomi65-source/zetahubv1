@@ -73,12 +73,16 @@ export default function KdramaDetails() {
       
       {/* Banner */}
       <div className="h-[60vh] relative overflow-hidden">
-        <img 
-          src={drama.image || null} 
-          className="w-full h-full object-cover opacity-30 blur-sm scale-110"
+        <motion.img 
+          initial={{ scale: 1.2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 0.4 }}
+          transition={{ duration: 1.5 }}
+          src={drama.cover || drama.image || null} 
+          className="w-full h-full object-cover"
           alt="Banner"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)] via-[var(--bg)]/90 to-transparent" />
+        <div className="absolute inset-0 bg-black/20" />
       </div>
 
       <div className="max-w-7xl mx-auto px-6 sm:px-12 -mt-40 relative z-10">

@@ -100,24 +100,33 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
     // Try multiple instances if one fails
     const instances = [
       "https://consumet-api-production-e65a.up.railway.app",
-      "https://consumet-api-five.vercel.app",
-      "https://consumet-api-one.vercel.app",
-      "https://consumet-api-three.vercel.app",
       "https://consumet-api-clone.vercel.app",
+      "https://consumet-api-one.vercel.app",
+      "https://consumet-api-two.vercel.app",
+      "https://consumet-api-three.vercel.app",
+      "https://consumet-api-four.vercel.app",
+      "https://consumet-api-five.vercel.app",
+      "https://consumet-api-six.vercel.app",
+      "https://consumet-api-seven.vercel.app",
+      "https://consumet-api-eight.vercel.app",
+      "https://consumet-api-nine.vercel.app",
+      "https://consumet-api-ten.vercel.app",
+      "https://api-consumet-org.vercel.app",
       "https://api.consumet.org"
     ];
     
     let lastError = null;
-    for (const base of instances) {
+    for (let i = 0; i < instances.length; i++) {
+      const base = instances[i];
       try {
         const url = `${base}/${subPath}${query ? "?" + query : ""}`;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000); // 6s timeout per instance
+        const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout per instance
 
         const response = await fetch(url, {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "Accept": "*/*",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
             "Origin": base,
             "Referer": base
           },
@@ -125,22 +134,31 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
         });
         clearTimeout(timeout);
 
+        // If it's a 404, it might be that this specific instance doesn't have the data, 
+        // but the instance itself is alive. We should still try others.
+        if (response.status === 404) {
+          throw new Error(`Instance ${base} returned 404 (Not Found)`);
+        }
+
         if (!response.ok) {
           throw new Error(`Instance ${base} returned ${response.status}`);
         }
 
-        const contentType = response.headers.get("content-type") || "application/octet-stream";
+        const contentType = response.headers.get("content-type") || "";
         
         if (contentType.includes("application/json")) {
           const data = await response.json();
+          // Some instances return an error object in JSON
+          if (data.error || data.message === "An error occurred") {
+            throw new Error(`Instance ${base} returned API error: ${data.error || data.message}`);
+          }
           return res.status(response.status).json(data);
         } else {
-          // If we expected JSON but got something else, it's a failure for this instance
+          // If we expected JSON but got something else
           if (subPath.includes("info") || subPath.includes("watch") || subPath.includes("trending") || subPath.includes("popular") || subPath.includes("search")) {
-             throw new Error(`Instance ${base} returned non-JSON content (${contentType}) for API call`);
+             throw new Error(`Instance ${base} returned non-JSON content (${contentType})`);
           }
 
-          // For non-JSON content (like video segments, images, etc.), pipe the response
           const arrayBuffer = await response.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
           
@@ -149,9 +167,10 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
           return res.status(response.status).send(buffer);
         }
       } catch (err) {
-        console.warn(`Consumet instance ${base} failed:`, err instanceof Error ? err.message : err);
+        console.warn(`Consumet instance ${base} failed (attempt ${i+1}/${instances.length}):`, err instanceof Error ? err.message : err);
         lastError = err;
-        continue; // Try next instance
+        // No delay needed, just move to next
+        continue; 
       }
     }
     
@@ -218,7 +237,7 @@ router.post("/auth/register", async (req, res) => {
       });
     } catch (dbError) {
       console.warn("Prisma failed, using mock storage:", dbError);
-      user = { id: `mock-${Date.now()}`, email, name, role, isVip: role === "OWNER" || role === "VIP" };
+      user = { id: `mock-${Date.now()}`, email, name, role, isVip: role === "OWNER" || role === "VIP", image: null };
       mockUsers.push({ ...user, password }); 
     }
     
@@ -277,6 +296,35 @@ router.get("/user/profile", async (req, res) => {
     res.json(user);
   } catch (error) {
     res.status(401).json({ error: "Invalid token" });
+  }
+});
+
+router.patch("/user/profile", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const { name, image } = req.body;
+    
+    const user = await prisma.user.update({
+      where: { id: decoded.userId },
+      data: { 
+        ...(name && { name }),
+        ...(image && { image })
+      },
+    });
+    
+    // Update mock storage if user is there
+    const mockIdx = mockUsers.findIndex(u => u.id === decoded.userId);
+    if (mockIdx !== -1) {
+      if (name) mockUsers[mockIdx].name = name;
+      if (image) mockUsers[mockIdx].image = image;
+    }
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(400).json({ error: "Failed to update profile" });
   }
 });
 

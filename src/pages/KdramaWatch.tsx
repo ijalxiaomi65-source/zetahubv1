@@ -70,8 +70,15 @@ export default function KdramaWatch() {
   const currentEp = drama.episodes?.find((e: any) => e.id === episodeId);
 
   return (
-    <div className="pt-24 px-6 max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
+    <div className="relative min-h-screen">
       <LoadingBar isLoading={loading} />
+      
+      {/* Background Wallpaper */}
+      <div className="fixed inset-0 z-0 opacity-10 pointer-events-none">
+        <img src={drama.image || null} className="w-full h-full object-cover blur-3xl" alt="" />
+      </div>
+
+      <div className="relative z-10 pt-24 px-6 max-w-[1800px] mx-auto grid grid-cols-1 lg:grid-cols-4 gap-8">
       
       <div className="lg:col-span-3 space-y-6">
         <Link to={`/kdrama/${id}`} className="flex items-center gap-2 text-white/40 hover:text-primary transition-all text-sm font-bold uppercase tracking-widest">
@@ -174,5 +181,6 @@ export default function KdramaWatch() {
         )}
       </div>
     </div>
+  </div>
   );
 }

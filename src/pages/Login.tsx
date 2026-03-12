@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Lock, User, ArrowRight, Github, Chrome } from "lucide-react";
 import { motion } from "framer-motion";
+import { useStore } from "../store/useStore";
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,6 +11,7 @@ export default function Login() {
   const [name, setName] = useState("");
   const [secret, setSecret] = useState("");
   const navigate = useNavigate();
+  const { setUser, setToken } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +27,8 @@ export default function Login() {
     const data = await res.json();
     if (res.ok) {
       if (isLogin) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        setToken(data.token);
+        setUser(data.user);
         navigate("/");
       } else {
         setIsLogin(true);

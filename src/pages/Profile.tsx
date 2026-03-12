@@ -1,25 +1,55 @@
-import React, { useState, useEffect } from "react";
-import { User, Crown, History, Heart, Settings, Shield, Play, ArrowLeft, Home } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { User, Crown, History, Heart, Settings, Shield, Play, ArrowLeft, Home, Camera } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
+import { useStore } from "../store/useStore";
 
 export default function Profile() {
-  const [user, setUser] = useState<any>(null);
+  const { user, setUser, token } = useStore();
   const [loading, setLoading] = useState(true);
   const [watchHistory, setWatchHistory] = useState<any[]>([]);
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Limit size to 1MB for base64
+    if (file.size > 1024 * 1024) {
+      alert("Image too large. Please select an image under 1MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64 = reader.result as string;
+      try {
+        const res = await fetch("/api/user/profile", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ image: base64 }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("token");
-      const localUser = JSON.parse(localStorage.getItem("user") || "null");
       const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
       setWatchHistory(history);
       
-      if (localUser) {
-        setUser(localUser);
-      }
-
       if (!token) {
         setLoading(false);
         return;
@@ -33,7 +63,6 @@ export default function Profile() {
           const data = await res.json();
           if (data) {
             setUser(data);
-            localStorage.setItem("user", JSON.stringify(data));
           }
         }
       } catch (e) {
@@ -42,7 +71,7 @@ export default function Profile() {
       setLoading(false);
     };
     fetchProfile();
-  }, []);
+  }, [token, setUser]);
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading Profile...</div>;
   if (!user) return <div className="h-screen flex items-center justify-center">Please login to view profile.</div>;
@@ -65,10 +94,30 @@ export default function Profile() {
         {/* Sidebar */}
         <div className="space-y-8">
           <div className="glass-card p-8 text-center space-y-4">
-            <div className="w-24 h-24 rounded-full bg-primary/20 mx-auto flex items-center justify-center border-2 border-primary/30 relative">
-              <User size={48} className="text-primary" />
+            <div 
+              className="w-24 h-24 rounded-full bg-primary/20 mx-auto flex items-center justify-center border-2 border-primary/30 relative group cursor-pointer overflow-hidden"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {user.image ? (
+                <img src={user.image} className="w-full h-full object-cover" alt="Avatar" />
+              ) : (
+                <User size={48} className="text-primary" />
+              )}
+              
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Camera size={24} className="text-white" />
+              </div>
+              
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleImageUpload} 
+              />
+
               {user.isVip && (
-                <div className="absolute -bottom-2 -right-2 bg-yellow-500 p-1.5 rounded-full border-4 border-[var(--bg)]">
+                <div className="absolute -bottom-2 -right-2 bg-yellow-500 p-1.5 rounded-full border-4 border-[var(--bg)] z-10">
                   <Crown size={16} className="text-black" fill="currentColor" />
                 </div>
               )}
