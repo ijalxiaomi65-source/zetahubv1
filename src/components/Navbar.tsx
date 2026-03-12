@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, User, Crown, LogOut, Sun, Moon } from "lucide-react";
+import { Search, User, Crown, LogOut, Sun, Moon, Menu } from "lucide-react";
 import { useStore } from "../store/useStore";
 
-export default function Navbar() {
+interface NavbarProps {
+  onMenuClick?: () => void;
+}
+
+export default function Navbar({ onMenuClick }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const { user, theme, setTheme, logout } = useStore();
   const navigate = useNavigate();
@@ -27,19 +31,25 @@ export default function Navbar() {
   };
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? "bg-[var(--bg)]/90 backdrop-blur-md py-3 shadow-xl" : "bg-transparent py-6"}`}>
-      <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-        <div className="flex items-center gap-10">
+    <nav className={`fixed top-0 left-0 right-0 z-[80] transition-all duration-300 ${isScrolled ? "bg-[var(--bg)]/90 backdrop-blur-md py-3 shadow-xl" : "bg-transparent py-6"}`}>
+      <div className="max-w-[1800px] mx-auto px-6 flex items-center justify-between">
+        <div className="flex items-center gap-6 sm:gap-10">
+          <button 
+            onClick={onMenuClick}
+            className="p-2 hover:bg-white/10 rounded-full transition-colors lg:hidden"
+          >
+            <Menu size={24} />
+          </button>
+
           <Link to="/" className="text-2xl font-bold tracking-tighter flex items-center gap-2">
             <span className="text-primary">ZETA</span>HUB
             <span className="bg-primary text-black text-[10px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest">PRO</span>
           </Link>
           
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium opacity-70">
+          <div className="hidden lg:flex items-center gap-6 text-sm font-medium opacity-70">
             <Link to="/" className="hover:text-primary transition-colors">Home</Link>
             <Link to="/gallery" className="hover:text-primary transition-colors">Gallery</Link>
-            <Link to="/donghua" className="hover:text-primary transition-colors">Donghua</Link>
-            <Link to="/kdrama" className="hover:text-primary transition-colors">K-Drama</Link>
+            <Link to="/kdrama" className="hover:text-primary transition-colors font-bold text-primary">K-Drama</Link>
             <Link to="/search" className="hover:text-primary transition-colors">Search</Link>
           </div>
         </div>
