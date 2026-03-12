@@ -7,25 +7,30 @@ interface HumanVerificationProps {
 }
 
 export default function HumanVerification({ onVerify }: HumanVerificationProps) {
-  const [status, setStatus] = useState<"loading" | "ready" | "verifying" | "success">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "verifying" | "language" | "success">("loading");
   const [progress, setProgress] = useState(0);
-  const [networkInfo, setNetworkInfo] = useState<{ ip: string; type: string }>({ ip: "Detecting...", type: "Analyzing..." });
+  const [networkInfo, setNetworkInfo] = useState<{ ip: string; type: string; region: string }>({ ip: "Detecting...", type: "Analyzing...", region: "Locating..." });
   const [securityStep, setSecurityStep] = useState("Initializing Security...");
 
   useEffect(() => {
-    // Fetch IP and Network Info
+    // Fetch IP, Network Info, and Region
     const fetchNetInfo = async () => {
       try {
-        const res = await fetch("https://api.ipify.org?format=json");
+        // Using ipapi.co for more detailed info including region
+        const res = await fetch("https://ipapi.co/json/");
         const data = await res.json();
         
         // Get connection type if available
         const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
         const type = conn ? `${conn.effectiveType || "Unknown"} ${conn.type || ""}` : "Broadband/WiFi";
         
-        setNetworkInfo({ ip: data.ip, type: type.trim() });
+        setNetworkInfo({ 
+          ip: data.ip || "127.0.0.1", 
+          type: type.trim(),
+          region: data.country_name ? `${data.city ? data.city + ", " : ""}${data.country_name}` : "Global"
+        });
       } catch (e) {
-        setNetworkInfo({ ip: "127.0.0.1", type: "Secure Tunnel" });
+        setNetworkInfo({ ip: "127.0.0.1", type: "Secure Tunnel", region: "Unknown Region" });
       }
     };
     fetchNetInfo();
@@ -39,14 +44,13 @@ export default function HumanVerification({ onVerify }: HumanVerificationProps) 
             return 100;
           }
           
-          // Dynamic security steps based on progress
           if (prev < 20) setSecurityStep("Initializing Security...");
           else if (prev < 40) setSecurityStep("Scanning Local Environment...");
           else if (prev < 60) setSecurityStep("Verifying Proxy Servers...");
           else if (prev < 80) setSecurityStep("Checking Network Integrity...");
           else setSecurityStep("Finalizing Handshake...");
           
-          return prev + 1; // Slower progress (1% per 50ms = 5s total)
+          return prev + 1;
         });
       }, 50);
       return () => clearInterval(interval);
@@ -62,14 +66,20 @@ export default function HumanVerification({ onVerify }: HumanVerificationProps) 
       setTimeout(() => {
         setSecurityStep("Validating IP Signature...");
         setTimeout(() => {
-          setStatus("success");
-          setSecurityStep("Access Granted");
-          setTimeout(() => {
-            onVerify();
-          }, 1200);
+          setStatus("language");
+          setSecurityStep("Select Language");
         }, 1500);
       }, 1500);
     }, 1500);
+  };
+
+  const handleLanguageSelect = (lang: string) => {
+    localStorage.setItem("zeta_lang", lang);
+    setStatus("success");
+    setSecurityStep("Access Granted");
+    setTimeout(() => {
+      onVerify();
+    }, 1200);
   };
 
   return (
@@ -127,14 +137,20 @@ export default function HumanVerification({ onVerify }: HumanVerificationProps) 
         </div>
 
         {/* Network Info Panel */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white/5 border border-white/5 p-3 rounded-xl text-left">
-            <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mb-1">IP Address</p>
-            <p className="text-xs font-mono text-primary truncate">{networkInfo.ip}</p>
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/5 border border-white/5 p-3 rounded-xl text-left">
+              <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mb-1">IP Address</p>
+              <p className="text-xs font-mono text-primary truncate">{networkInfo.ip}</p>
+            </div>
+            <div className="bg-white/5 border border-white/5 p-3 rounded-xl text-left">
+              <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mb-1">Network Type</p>
+              <p className="text-xs font-mono text-primary truncate">{networkInfo.type}</p>
+            </div>
           </div>
           <div className="bg-white/5 border border-white/5 p-3 rounded-xl text-left">
-            <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mb-1">Network Type</p>
-            <p className="text-xs font-mono text-primary truncate">{networkInfo.type}</p>
+            <p className="text-[8px] text-white/20 font-black uppercase tracking-widest mb-1">Detected Region</p>
+            <p className="text-xs font-mono text-primary truncate">{networkInfo.region}</p>
           </div>
         </div>
 
@@ -166,6 +182,34 @@ export default function HumanVerification({ onVerify }: HumanVerificationProps) 
                 ))}
               </div>
             </div>
+          ) : status === "language" ? (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="space-y-4"
+            >
+              <p className="text-white/60 text-xs font-bold uppercase tracking-widest mb-4">Choose Your Interface Language</p>
+              <div className="grid grid-cols-1 gap-3">
+                <button 
+                  onClick={() => handleLanguageSelect("id")}
+                  className="w-full bg-white/5 border border-white/10 py-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-primary hover:text-black transition-all group"
+                >
+                  <span className="text-lg">🇮🇩</span> Bahasa Indonesia
+                </button>
+                <button 
+                  onClick={() => handleLanguageSelect("en")}
+                  className="w-full bg-white/5 border border-white/10 py-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-primary hover:text-black transition-all group"
+                >
+                  <span className="text-lg">🇺🇸</span> English (US)
+                </button>
+                <button 
+                  onClick={() => handleLanguageSelect("jp")}
+                  className="w-full bg-white/5 border border-white/10 py-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-primary hover:text-black transition-all group"
+                >
+                  <span className="text-lg">🇯🇵</span> 日本語 (Japanese)
+                </button>
+              </div>
+            </motion.div>
           ) : status === "success" ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
