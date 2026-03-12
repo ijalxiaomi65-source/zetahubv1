@@ -95,7 +95,7 @@ export default function Login() {
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Email Address or Username</label>
+            <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Username</label>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
               <input 
@@ -103,7 +103,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
-                placeholder="you@example.com or Username"
+                placeholder="Enter your username"
                 required
               />
             </div>
@@ -130,20 +130,6 @@ export default function Login() {
         </form>
 
         <div className="mt-10 space-y-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
-            <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold"><span className="bg-[#050505] px-4 text-white/20">Or continue with</span></div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <button className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 py-3 rounded-xl hover:bg-white/10 transition-all">
-              <Chrome size={18} /> Google
-            </button>
-            <button className="flex items-center justify-center gap-2 bg-white/5 border border-white/10 py-3 rounded-xl hover:bg-white/10 transition-all">
-              <Github size={18} /> GitHub
-            </button>
-          </div>
-
           <p className="text-center text-sm text-white/40">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button onClick={() => setIsLogin(!isLogin)} className="text-primary font-bold hover:underline">

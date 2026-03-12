@@ -145,7 +145,7 @@ export default function Profile() {
             <button className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-white/5 transition-all text-muted font-bold">
               <Settings size={20} /> Settings
             </button>
-            {user.role === "OWNER" && (
+            {(user.role === "OWNER" || user.role === "ADMIN") && (
               <Link to="/admin" className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-red-500/10 transition-all text-red-500 font-bold">
                 <Shield size={20} /> Admin Panel
               </Link>

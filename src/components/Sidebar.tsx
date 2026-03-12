@@ -10,7 +10,9 @@ import {
   TrendingUp, 
   Image as ImageIcon,
   LayoutGrid,
-  Sparkles
+  Sparkles,
+  Shield,
+  Crown
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useStore } from "../store/useStore";
@@ -54,7 +56,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         { name: "My Watchlist", icon: Heart, path: "/profile" },
         { name: "History", icon: History, path: "/profile" },
       ]
-    }
+    },
+    ...(user?.role === "OWNER" || user?.role === "ADMIN" ? [{
+      title: "Management",
+      items: [
+        { name: "Admin Panel", icon: Shield, path: "/admin" },
+      ]
+    }] : [])
   ];
 
   const sidebarVariants = {
@@ -127,8 +135,13 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 )}
               </div>
               <div className="flex-grow min-w-0">
-                <p className="text-sm font-bold truncate">{user.name}</p>
-                <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">{user.role}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold truncate">{user.name}</p>
+                  {user.isVip && <Crown size={12} className="text-yellow-500 shrink-0" fill="currentColor" />}
+                </div>
+                <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">
+                  {user.role === 'OWNER' ? 'OWNER' : user.role === 'ADMIN' ? 'ADMIN' : user.isVip ? 'VIP MEMBER' : 'FREE USER'}
+                </p>
               </div>
             </Link>
           </div>

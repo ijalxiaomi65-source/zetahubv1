@@ -9,7 +9,7 @@ export default function Admin() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    if (user.role !== "OWNER") {
+    if (user.role !== "OWNER" && user.role !== "ADMIN") {
       navigate("/");
       return;
     }

@@ -78,7 +78,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
                   )}
                 </div>
                 <span className="text-sm font-medium hidden sm:inline">{user.name}</span>
-                {user.role === "VIP" && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}
+                {user.isVip && <Crown size={14} className="text-yellow-500 fill-yellow-500" />}
               </Link>
               <button onClick={handleLogout} className="p-2 hover:bg-red-500/10 text-red-500 rounded-full transition-colors">
                 <LogOut size={20} />
