@@ -104,7 +104,42 @@ app.get("/api/proxy/jikan/*", async (req, res) => {
   }
 });
 
-// Proxy for Consumet (Anime & K-Drama)
+// Proxy for TMDB (K-Drama)
+const tmdbCache = new Map<string, { data: any; timestamp: number }>();
+const TMDB_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+app.get("/api/proxy/tmdb/*", async (req, res) => {
+  try {
+    const subPath = req.params[0];
+    const query = new URLSearchParams(req.query as any).toString();
+    const apiKey = process.env.TMDB_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(500).json({ error: "TMDB_API_KEY is not configured" });
+    }
+
+    const cacheKey = `${subPath}?${query}`;
+    const cached = tmdbCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < TMDB_CACHE_TTL) {
+      return res.json(cached.data);
+    }
+
+    const url = `https://api.themoviedb.org/3/${subPath}?api_key=${apiKey}${query ? "&" + query : ""}`;
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (response.ok) {
+      tmdbCache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+
+    res.status(response.status).json(data);
+  } catch (error) {
+    console.error("TMDB Proxy Error:", error);
+    res.status(500).json({ error: "Failed to fetch from TMDB" });
+  }
+});
+
+// Proxy for Consumet (Anime & Donghua)
 app.get("/api/proxy/consumet/*", async (req, res) => {
   try {
     const subPath = req.params[0];

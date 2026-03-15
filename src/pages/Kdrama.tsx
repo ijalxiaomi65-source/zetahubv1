@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { fetchTrendingKdrama, fetchPopularKdrama } from "../lib/api";
+import { fetchTrendingKdramaTMDB, fetchPopularKdramaTMDB } from "../lib/api";
 import { Link } from "react-router-dom";
-import { Play, Star, ChevronRight } from "lucide-react";
+import { Play, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { SectionSkeleton } from "../components/Skeleton";
 import { LoadingBar } from "../components/LoadingBar";
@@ -16,8 +16,8 @@ export default function Kdrama() {
       try {
         setLoading(true);
         const [t, p] = await Promise.all([
-          fetchTrendingKdrama(),
-          fetchPopularKdrama()
+          fetchTrendingKdramaTMDB(),
+          fetchPopularKdramaTMDB()
         ]);
         setTrending(t);
         setPopular(p);
@@ -35,7 +35,7 @@ export default function Kdrama() {
       <LoadingBar isLoading={loading} />
       
       <div className="space-y-4">
-        <h1 className="text-5xl font-black tracking-tighter">Korean Dramas</h1>
+        <h1 className="text-5xl font-black tracking-tighter bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent">Korean Dramas</h1>
         <p className="text-white/40 max-w-2xl">The latest and most popular K-Dramas, updated daily. High quality streaming with multiple server options.</p>
       </div>
 
@@ -62,7 +62,16 @@ export default function Kdrama() {
                 >
                   <Link to={`/kdrama/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.image || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
+                      <img 
+                        src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                        alt={item.name} 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md flex items-center gap-1 text-[10px] font-bold">
+                        <Star size={10} className="text-yellow-500 fill-yellow-500" />
+                        {item.vote_average?.toFixed(1) || "N/A"}
+                      </div>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                         <div className="w-full h-12 bg-primary text-black rounded-xl flex items-center justify-center font-bold gap-2">
                           <Play size={16} fill="currentColor" /> Watch Now
@@ -70,8 +79,8 @@ export default function Kdrama() {
                       </div>
                     </div>
                     <div className="mt-4 space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
-                      <p className="text-white/40 text-[10px] uppercase tracking-widest">K-Drama • {item.releaseDate || "2026"}</p>
+                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.name}</h3>
+                      <p className="text-white/40 text-[10px] uppercase tracking-widest">K-Drama • {item.first_air_date?.split("-")[0] || "2026"}</p>
                     </div>
                   </Link>
                 </motion.div>
@@ -93,11 +102,20 @@ export default function Kdrama() {
                 >
                   <Link to={`/kdrama/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.image || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
+                      <img 
+                        src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                        alt={item.name} 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md flex items-center gap-1 text-[10px] font-bold">
+                        <Star size={10} className="text-yellow-500 fill-yellow-500" />
+                        {item.vote_average?.toFixed(1) || "N/A"}
+                      </div>
                     </div>
                     <div className="mt-4 space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
-                      <p className="text-white/40 text-[10px] uppercase tracking-widest">K-Drama • Popular</p>
+                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.name}</h3>
+                      <p className="text-white/40 text-[10px] uppercase tracking-widest">K-Drama • {item.first_air_date?.split("-")[0] || "Popular"}</p>
                     </div>
                   </Link>
                 </motion.div>

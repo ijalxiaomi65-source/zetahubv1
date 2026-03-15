@@ -48,37 +48,31 @@ export default function App() {
 
   return (
     <Router>
-      {!user ? (
-        <Routes>
-          <Route path="*" element={<Login />} />
-        </Routes>
-      ) : (
-        <div className="min-h-screen flex flex-col">
-          <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
-          <div className="flex flex-1 pt-0">
-            <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-            <main className="flex-grow min-w-0">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/gallery" element={<Gallery />} />
-                <Route path="/anime/:id" element={<Details />} />
-                <Route path="/watch/:id/:episode" element={<Watch />} />
-                <Route path="/kdrama" element={<Kdrama />} />
-                <Route path="/kdrama/:id" element={<KdramaDetails />} />
-                <Route path="/kdrama/watch/:id/:episodeId" element={<KdramaWatch />} />
-                <Route path="/login" element={<Navigate to="/" />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/search" element={<Search />} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="*" element={<Navigate to="/" />} />
-              </Routes>
-            </main>
-          </div>
-          <footer className="p-8 text-center text-white/40 text-sm border-t border-white/5 lg:ml-72">
-            &copy; 2026 ZetaHub Premium. All rights reserved.
-          </footer>
+      <div className="min-h-screen flex flex-col">
+        <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <div className="flex flex-1 pt-0">
+          <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+          <main className="flex-grow min-w-0">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/anime/:id" element={<Details />} />
+              <Route path="/watch/:id/:episode" element={<Watch />} />
+              <Route path="/kdrama" element={<Kdrama />} />
+              <Route path="/kdrama/:id" element={<KdramaDetails />} />
+              <Route path="/kdrama/watch/:id/:episodeId" element={<KdramaWatch />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/admin" element={user?.role === "OWNER" ? <Admin /> : <Navigate to="/" />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </main>
         </div>
-      )}
+        <footer className="p-8 text-center text-white/40 text-sm border-t border-white/5 lg:ml-72">
+          &copy; 2026 ZetaHub Premium. All rights reserved.
+        </footer>
+      </div>
     </Router>
   );
 }

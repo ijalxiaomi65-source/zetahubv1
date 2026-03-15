@@ -2,6 +2,7 @@
 const ANILIST_URL = "/api/proxy/anilist";
 const JIKAN_URL = "/api/proxy/jikan";
 const CONSUMET_URL = "/api/proxy/consumet";
+const TMDB_URL = "/api/proxy/tmdb";
 
 // Simple in-memory cache
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -197,6 +198,101 @@ export const searchAnime = async (search: string) => {
   } catch (error) {
     console.error("searchAnime error:", error);
     throw error;
+  }
+};
+
+// Consumet GogoAnime API (as requested)
+export const fetchTopAiringAnime = async (page: number = 1): Promise<any[]> => {
+  try {
+    const response = await fetch(`${CONSUMET_URL}/anime/gogoanime/top-airing?page=${page}`);
+    if (!response.ok) throw new Error("Failed to fetch top airing anime");
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error("fetchTopAiringAnime error:", error);
+    return [];
+  }
+};
+
+export const searchAnimeGogo = async (query: string, page: number = 1): Promise<any[]> => {
+  try {
+    const response = await fetch(`${CONSUMET_URL}/anime/gogoanime/${encodeURIComponent(query)}?page=${page}`);
+    if (!response.ok) throw new Error("Failed to search anime");
+    const data = await response.json();
+    return data.results || [];
+  } catch (error) {
+    console.error("searchAnimeGogo error:", error);
+    return [];
+  }
+};
+
+export const fetchAnimeInfoGogo = async (id: string): Promise<any> => {
+  try {
+    const response = await fetch(`${CONSUMET_URL}/anime/gogoanime/info/${id}`);
+    if (!response.ok) throw new Error("Failed to fetch anime info");
+    return await response.json();
+  } catch (error) {
+    console.error("fetchAnimeInfoGogo error:", error);
+    return null;
+  }
+};
+
+export const fetchAnimeEpisodeStreamGogo = async (episodeId: string): Promise<any> => {
+  try {
+    const response = await fetch(`${CONSUMET_URL}/anime/gogoanime/watch/${episodeId}`);
+    if (!response.ok) throw new Error("Failed to fetch episode stream");
+    return await response.json();
+  } catch (error) {
+    console.error("fetchAnimeEpisodeStreamGogo error:", error);
+    return null;
+  }
+};
+
+// TMDB K-Drama API (as requested)
+export const fetchTrendingKdramaTMDB = async (): Promise<any[]> => {
+  try {
+    const response = await fetch(`${TMDB_URL}/trending/tv/week`);
+    if (!response.ok) throw new Error("Failed to fetch trending TV from TMDB");
+    const data = await response.json();
+    return data.results.filter((item: any) => item.original_language === "ko") || [];
+  } catch (error) {
+    console.error("fetchTrendingKdramaTMDB error:", error);
+    return [];
+  }
+};
+
+export const fetchPopularKdramaTMDB = async (): Promise<any[]> => {
+  try {
+    const response = await fetch(`${TMDB_URL}/tv/popular`);
+    if (!response.ok) throw new Error("Failed to fetch popular TV from TMDB");
+    const data = await response.json();
+    return data.results.filter((item: any) => item.original_language === "ko") || [];
+  } catch (error) {
+    console.error("fetchPopularKdramaTMDB error:", error);
+    return [];
+  }
+};
+
+export const searchKdramaTMDB = async (query: string): Promise<any[]> => {
+  try {
+    const response = await fetch(`${TMDB_URL}/search/tv?query=${encodeURIComponent(query)}`);
+    if (!response.ok) throw new Error("Failed to search TV from TMDB");
+    const data = await response.json();
+    return data.results.filter((item: any) => item.original_language === "ko") || [];
+  } catch (error) {
+    console.error("searchKdramaTMDB error:", error);
+    return [];
+  }
+};
+
+export const fetchKdramaDetailsTMDB = async (id: string): Promise<any> => {
+  try {
+    const response = await fetch(`${TMDB_URL}/tv/${id}`);
+    if (!response.ok) throw new Error("Failed to fetch TV details from TMDB");
+    return await response.json();
+  } catch (error) {
+    console.error("fetchKdramaDetailsTMDB error:", error);
+    return null;
   }
 };
 

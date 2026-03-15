@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { fetchTrending, fetchPopular, fetchTrendingDonghua, fetchPopularDonghua, fetchTrendingKdrama } from "../lib/api";
+import { 
+  fetchTopAiringAnime, 
+  fetchTrendingDonghua, 
+  fetchTrendingKdramaTMDB 
+} from "../lib/api";
 import { Link } from "react-router-dom";
 import { Play, Star, ChevronRight, Clock, Crown, TrendingUp, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
@@ -8,7 +12,6 @@ import { LoadingBar } from "../components/LoadingBar";
 
 export default function Home() {
   const [trending, setTrending] = useState<any[]>([]);
-  const [popular, setPopular] = useState<any[]>([]);
   const [donghua, setDonghua] = useState<any[]>([]);
   const [kdrama, setKdrama] = useState<any[]>([]);
   const [galleryPreview, setGalleryPreview] = useState<any[]>([]);
@@ -26,21 +29,16 @@ export default function Home() {
         const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
         setWatchHistory(history);
 
-        // Staggered loading for better performance
-        const t = await fetchTrending();
-        setTrending(t);
-        
-        await new Promise(r => setTimeout(r, 500));
-        const p = await fetchPopular();
-        setPopular(p);
-        
-        await new Promise(r => setTimeout(r, 500));
-        const d = await fetchTrendingDonghua();
-        setDonghua(d);
+        // Fetch data from new sources
+        const [trendingData, donghuaData, kdramaData] = await Promise.all([
+          fetchTopAiringAnime(),
+          fetchTrendingDonghua(),
+          fetchTrendingKdramaTMDB()
+        ]);
 
-        await new Promise(r => setTimeout(r, 500));
-        const k = await fetchTrendingKdrama();
-        setKdrama(k.slice(0, 12));
+        setTrending(trendingData.slice(0, 12));
+        setDonghua(donghuaData.slice(0, 12));
+        setKdrama(kdramaData.slice(0, 12));
 
         // Fetch Nekosia preview
         try {
@@ -55,7 +53,7 @@ export default function Home() {
         
       } catch (err: any) {
         console.error("Home load error:", err);
-        setError("Failed to load content. Please try again.");
+        setError("Failed to load content. Please check your API keys and connection.");
       } finally {
         setLoading(false);
       }
@@ -93,7 +91,7 @@ export default function Home() {
           <>
             <div className="absolute inset-0 z-0">
               <img 
-                src={trending[0].bannerImage || trending[0].coverImage.extraLarge || null} 
+                src={trending[0].image || null} 
                 className="w-full h-full object-cover opacity-40 scale-105 animate-slow-zoom"
                 alt="Hero"
               />
@@ -110,13 +108,15 @@ export default function Home() {
                 <span className="bg-primary text-black text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-lg shadow-primary/20">#1 Trending</span>
                 <div className="flex items-center gap-1 text-yellow-500 text-sm font-bold">
                   <Star size={16} fill="currentColor" />
-                  {trending[0].averageScore / 10}
+                  Trending Now
                 </div>
               </div>
               <h1 className="text-6xl sm:text-8xl font-black tracking-tighter leading-none">
-                {trending[0].title.english || trending[0].title.romaji}
+                {trending[0].title}
               </h1>
-              <p className="text-lg text-white/60 line-clamp-3 max-w-xl leading-relaxed" dangerouslySetInnerHTML={{ __html: trending[0].description }} />
+              <p className="text-lg text-white/60 line-clamp-3 max-w-xl leading-relaxed">
+                Watch the latest episodes of {trending[0].title} on ZetaHub. High quality streaming with multiple sources.
+              </p>
               <div className="flex flex-wrap gap-4 pt-4">
                 <Link 
                   to={`/anime/${trending[0].id}`}
@@ -147,22 +147,22 @@ export default function Home() {
               {watchHistory.map((item) => (
                 <Link 
                   key={item.animeId} 
-                  to={`/watch/${item.animeId}/${item.episode}`}
+                  to={`/watch/${item.animeId}/${item.episodeNum}`}
                   className="glass-card group flex gap-4 p-4 hover:border-primary/50 transition-all"
                 >
-                  <div className="w-24 aspect-[2/3] rounded-xl overflow-hidden shrink-0">
-                    <img src={item.animeCover || null} className="w-full h-full object-cover" alt={item.animeTitle} />
+                  <div className="w-24 aspect-[2/3] rounded-xl overflow-hidden shrink-0 bg-white/5">
+                    <img src={item.image || null} className="w-full h-full object-cover" alt={item.title} />
                   </div>
                   <div className="flex flex-col justify-between py-1">
                     <div className="space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.animeTitle}</h3>
-                      <p className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Episode {item.episode}</p>
+                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
+                      <p className="text-white/40 text-[10px] uppercase font-bold tracking-widest">Episode {item.episodeNum}</p>
                     </div>
                     <div className="space-y-2">
                       <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
                         <div 
                           className="h-full bg-primary" 
-                          style={{ width: `${Math.min(100, (item.timestamp / (item.duration || 1440)) * 100)}%` }} 
+                          style={{ width: `${Math.min(100, (item.progress / (item.duration || 1)) * 100)}%` }} 
                         />
                       </div>
                       <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Resume Playback</p>
@@ -189,15 +189,16 @@ export default function Home() {
                 <motion.div key={item.id} whileHover={{ scale: 1.05 }} className="group">
                   <Link to={`/anime/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.coverImage.large || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title.english} />
-                      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-black border border-white/10 flex items-center gap-1">
-                        <Star size={10} className="text-yellow-500" fill="currentColor" />
-                        {item.averageScore / 10}
-                      </div>
+                      <img src={item.image || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
+                      {item.episodeNumber && (
+                        <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-black border border-white/10 flex items-center gap-1">
+                          EP {item.episodeNumber}
+                        </div>
+                      )}
                     </div>
                     <div className="mt-4 space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title.english || item.title.romaji}</h3>
-                      <p className="text-white/40 text-[10px] uppercase tracking-widest">{item.genres[0]} • {item.genres[1] || "Action"}</p>
+                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
+                      <p className="text-white/40 text-[10px] uppercase tracking-widest">{item.genres?.join(" • ") || "Anime"}</p>
                     </div>
                   </Link>
                 </motion.div>
@@ -224,14 +225,19 @@ export default function Home() {
                 <motion.div key={item.id} whileHover={{ scale: 1.05 }} className="group">
                   <Link to={`/kdrama/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.image || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
-                      <div className="absolute bottom-3 left-3 bg-primary text-black text-[8px] font-black px-2 py-1 rounded uppercase tracking-widest">
-                        NEW EPISODE
+                      <img 
+                        src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                        alt={item.name} 
+                      />
+                      <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-black border border-white/10 flex items-center gap-1">
+                        <Star size={10} className="text-yellow-500" fill="currentColor" />
+                        {item.vote_average?.toFixed(1)}
                       </div>
                     </div>
                     <div className="mt-4 space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
-                      <p className="text-white/40 text-[10px] uppercase tracking-widest">Korean Drama • {item.releaseDate || "2026"}</p>
+                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.name}</h3>
+                      <p className="text-white/40 text-[10px] uppercase tracking-widest">Korean Drama • {item.first_air_date?.split("-")[0] || "2026"}</p>
                     </div>
                   </Link>
                 </motion.div>
@@ -292,11 +298,11 @@ export default function Home() {
                 <motion.div key={item.id} whileHover={{ scale: 1.05 }} className="group">
                   <Link to={`/anime/${item.id}`}>
                     <div className="aspect-[2/3] rounded-2xl overflow-hidden bg-white/5 border border-white/10 relative shadow-2xl">
-                      <img src={item.coverImage.large || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title.english} />
+                      <img src={item.image || null} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
                     </div>
                     <div className="mt-4 space-y-1">
-                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title.english || item.title.romaji || item.title.native}</h3>
-                      <p className="text-white/40 text-[10px] uppercase tracking-widest">CN • {item.genres[0]}</p>
+                      <h3 className="font-bold text-sm line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
+                      <p className="text-white/40 text-[10px] uppercase tracking-widest">CN • {item.genres?.join(" • ") || "Donghua"}</p>
                     </div>
                   </Link>
                 </motion.div>

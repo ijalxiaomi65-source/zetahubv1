@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { fetchDetails, fetchAnimeEpisodes, fetchStreamSources, searchAnimeAcrossProviders } from "../lib/api";
+import { fetchAnimeInfoGogo, fetchAnimeEpisodeStreamGogo } from "../lib/api";
 import { Play, SkipForward, Settings, Maximize, Volume2, List, MessageSquare, Send, Crown, X, CheckCircle2, AlertCircle, ArrowLeft, Star } from "lucide-react";
 import { Skeleton } from "../components/Skeleton";
 import { LoadingBar } from "../components/LoadingBar";
@@ -15,9 +15,8 @@ export default function Watch() {
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [server, setServer] = useState(0); // Index of source in current provider
-  const [provider, setProvider] = useState("anilist");
-  const [availableProviders, setAvailableProviders] = useState<any>({});
+  const [server, setServer] = useState(0); 
+  const [provider, setProvider] = useState("gogoanime");
   const [isVip, setIsVip] = useState(false);
   const [showVipModal, setShowVipModal] = useState(false);
   const [showAd, setShowAd] = useState(false);
@@ -28,9 +27,9 @@ export default function Watch() {
   useEffect(() => {
     if (id && episode) {
       const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
-      const saved = history.find((h: any) => h.animeId === id && h.episode === parseInt(episode));
+      const saved = history.find((h: any) => h.animeId === id && h.episodeNum === parseInt(episode));
       if (saved) {
-        setCurrentTime(saved.timestamp || 0);
+        setCurrentTime(saved.progress || 0);
       }
     }
   }, [id, episode]);
@@ -48,11 +47,11 @@ export default function Watch() {
           
           const entry = {
             animeId: id,
-            animeTitle: anime.title.english || anime.title.romaji || anime.title.native,
-            animeCover: anime.coverImage.large || anime.coverImage.extraLarge,
-            episode: parseInt(episode),
-            timestamp: next,
-            duration: (anime.duration || 24) * 60,
+            title: anime.title,
+            image: anime.image,
+            episodeNum: parseInt(episode),
+            progress: next,
+            duration: 1440, // Default 24 mins
             updatedAt: Date.now()
           };
 
@@ -73,7 +72,7 @@ export default function Watch() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    const isOwner = user.name === "Zeta" || user.role === "OWNER";
+    const isOwner = user.username === "Zeta" || user.role === "OWNER";
     setIsVip(user.isVip || isOwner || false);
 
     if (!user.isVip && !isOwner) {
@@ -114,28 +113,24 @@ export default function Watch() {
       if (id && episode) {
         setLoading(true);
         try {
-          const details = await fetchDetails(id);
+          const details = await fetchAnimeInfoGogo(id);
           setAnime(details);
+          setEpisodes(details.episodes || []);
           
-          const title = details.title.english || details.title.romaji || details.title.native;
-          const eps = await fetchAnimeEpisodes(id, title);
-          setEpisodes(eps);
-          
-          // Search across providers for fallback
-          searchAnimeAcrossProviders(title).then(setAvailableProviders);
-          
-          const currentEp = eps.find((e: any) => e.number === parseInt(episode));
+          const currentEp = details.episodes?.find((e: any) => e.number === parseInt(episode));
           if (currentEp) {
-            const sources = await fetchStreamSources(currentEp.id, provider);
+            const sources = await fetchAnimeEpisodeStreamGogo(currentEp.id);
             setStreamData(sources);
           }
 
-          // Fetch comments
-          const res = await fetch(`/api/comments/${id}-${episode}`);
-          if (res.ok) {
-            const data = await res.json();
-            setComments(data);
-          }
+          // Fetch comments (mock or real)
+          try {
+            const res = await fetch(`/api/comments/${id}-${episode}`);
+            if (res.ok) {
+              const data = await res.json();
+              setComments(data);
+            }
+          } catch (e) {}
         } catch (e) {
           console.error("Watch load error:", e);
         } finally {
@@ -146,49 +141,16 @@ export default function Watch() {
     load();
   }, [id, episode]);
 
-  useEffect(() => {
-    const switchProvider = async () => {
-      if (!id || !episode || !episodes.length) return;
-      
-      setLoading(true);
-      try {
-        let epId = "";
-        if (provider === "anilist") {
-          epId = episodes.find((e: any) => e.number === parseInt(episode))?.id;
-        } else if (availableProviders[provider]) {
-          // If we have the ID for this provider, we need to get its episodes
-          const res = await fetch(`/api/proxy/consumet/anime/${provider}/info/${availableProviders[provider].id}`);
-          const data = await res.json();
-          epId = data.episodes?.find((e: any) => e.number === parseInt(episode))?.id;
-        }
-
-        if (epId) {
-          const sources = await fetchStreamSources(epId, provider);
-          setStreamData(sources);
-          setServer(0);
-        } else {
-          setStreamData(null);
-        }
-      } catch (e) {
-        console.error("Provider switch error:", e);
-        setStreamData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    switchProvider();
-  }, [provider, episode]);
-
   const handleAutoNext = () => {
     const nextEp = parseInt(episode || "1") + 1;
-    if (nextEp <= (anime?.episodes || episodes.length)) {
+    if (nextEp <= (anime?.totalEpisodes || episodes.length)) {
       navigate(`/watch/${id}/${nextEp}`);
     }
   };
 
   const buyVip = () => {
     const userStr = localStorage.getItem("user");
-    let user = userStr ? JSON.parse(userStr) : { id: "guest-" + Date.now(), name: "Guest" };
+    let user = userStr ? JSON.parse(userStr) : { id: "guest-" + Date.now(), username: "Guest" };
     
     user.isVip = true;
     user.role = "VIP";
@@ -324,27 +286,14 @@ export default function Watch() {
             {currentSource ? (
               <VideoPlayer 
                 src={currentSource.url} 
-                poster={anime.bannerImage || anime.coverImage.extraLarge}
+                poster={anime.image}
                 onEnded={handleAutoNext}
-                onPlay={handleVideoStart}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-center p-12">
                 <AlertCircle size={48} className="text-red-500 mb-4" />
                 <h2 className="text-2xl font-black tracking-tighter">Stream Unavailable</h2>
-                <p className="text-white/60 text-sm max-w-md mt-2">We're having trouble loading this episode on {provider.toUpperCase()}. Please try switching servers or check back later.</p>
-                
-                {/* Fallback YouTube Search for Music Videos */}
-                {anime.format === "MUSIC" && (
-                  <a 
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(anime.title.english || anime.title.romaji) + " MV"}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-6 px-6 py-3 bg-red-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-red-700 transition-all"
-                  >
-                    Watch on YouTube
-                  </a>
-                )}
+                <p className="text-white/60 text-sm max-w-md mt-2">We're having trouble loading this episode. Please try switching servers or check back later.</p>
               </div>
             )}
           </div>
@@ -354,13 +303,8 @@ export default function Watch() {
             <div className="flex flex-wrap items-center gap-3 glass-card p-4">
               <span className="text-xs font-black uppercase tracking-widest text-muted ml-2">Select Server:</span>
               {[
-                { id: "anilist", name: "Server 1", provider: "anilist" },
-                { id: "gogoanime", name: "Server 2", provider: "gogoanime" },
-                { id: "zoro", name: "Server 3", provider: "zoro" },
-                { id: "enime", name: "Server 4", provider: "enime" },
-                { id: "animepahe", name: "Server 5", provider: "animepahe" },
-                { id: "bilibili", name: "Server 6", provider: "bilibili" },
-                { id: "fallback", name: "Server 7", provider: "anilist" },
+                { id: "gogoanime", name: "GogoAnime", provider: "gogoanime" },
+                { id: "vidstreaming", name: "VidStreaming", provider: "vidstreaming" },
               ].map((s) => (
                 <button 
                   key={s.id}
@@ -393,7 +337,7 @@ export default function Watch() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-black tracking-tighter mb-2">
-              {anime.title.english || anime.title.romaji || anime.title.native} - Episode {episode}
+              {anime.title} - Episode {episode}
             </h1>
             <div className="flex items-center gap-4">
               <p className="text-muted text-sm font-medium uppercase tracking-widest">
@@ -428,7 +372,9 @@ export default function Watch() {
 
         {/* Description */}
         <div className="glass-card p-8">
-          <p className="text-white/60 text-sm leading-relaxed line-clamp-3 hover:line-clamp-none transition-all cursor-pointer" dangerouslySetInnerHTML={{ __html: anime.description }} />
+          <p className="text-white/60 text-sm leading-relaxed line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
+            {anime.description}
+          </p>
         </div>
 
         {/* Comments Section */}
@@ -456,11 +402,11 @@ export default function Watch() {
             {comments.map((comment: any) => (
               <div key={comment.id} className="flex gap-4 p-6 rounded-2xl bg-white/5 border border-white/5">
                 <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
-                  <span className="text-primary font-bold">{comment.user?.name?.[0] || "?"}</span>
+                  <span className="text-primary font-bold">{comment.user?.username?.[0] || "?"}</span>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold">{comment.user?.name || "Anonymous"}</span>
+                    <span className="font-bold">{comment.user?.username || "Anonymous"}</span>
                     <span className="text-white/20 text-xs">
                       {new Date(comment.createdAt).toLocaleDateString()}
                     </span>
@@ -480,36 +426,20 @@ export default function Watch() {
             Episodes <List size={18} className="text-primary" />
           </h3>
           <div className="space-y-3 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
-            {episodes.length > 0 ? (
-              episodes.map((ep: any) => (
-                <Link 
-                  key={ep.id} 
-                  to={`/watch/${id}/${ep.number}`}
-                  className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${parseInt(episode || "1") === ep.number ? "bg-primary border-primary text-black" : "bg-white/5 border-white/5 hover:bg-white/10"}`}
-                >
-                  <span className={`text-lg font-black italic ${parseInt(episode || "1") === ep.number ? "text-black/40" : "text-white/20"}`}>{ep.number.toString().padStart(2, '0')}</span>
-                  <div className="flex-grow">
-                    <p className="font-bold text-sm line-clamp-1">{ep.title || `Episode ${ep.number}`}</p>
-                    <p className={`text-[10px] uppercase font-bold tracking-widest ${parseInt(episode || "1") === ep.number ? "text-black/60" : "text-white/30"}`}>24:00</p>
-                  </div>
-                  {parseInt(episode || "1") === ep.number && <Play size={14} fill="currentColor" />}
-                </Link>
-              ))
-            ) : (
-              Array.from({ length: anime.episodes || 12 }).map((_, i) => (
-                <Link 
-                  key={i} 
-                  to={`/watch/${id}/${i + 1}`}
-                  className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${parseInt(episode || "1") === i + 1 ? "bg-primary border-primary text-black" : "bg-white/5 border-white/5 hover:bg-white/10"}`}
-                >
-                  <span className={`text-lg font-black italic ${parseInt(episode || "1") === i + 1 ? "text-black/40" : "text-white/20"}`}>{(i + 1).toString().padStart(2, '0')}</span>
-                  <div className="flex-grow">
-                    <p className="font-bold text-sm">Episode {i + 1}</p>
-                    <p className={`text-[10px] uppercase font-bold tracking-widest ${parseInt(episode || "1") === i + 1 ? "text-black/60" : "text-white/30"}`}>24:00</p>
-                  </div>
-                </Link>
-              ))
-            )}
+            {episodes.map((ep: any) => (
+              <Link 
+                key={ep.id} 
+                to={`/watch/${id}/${ep.number}`}
+                className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${parseInt(episode || "1") === ep.number ? "bg-primary border-primary text-black" : "bg-white/5 border-white/5 hover:bg-white/10"}`}
+              >
+                <span className={`text-lg font-black italic ${parseInt(episode || "1") === ep.number ? "text-black/40" : "text-white/20"}`}>{ep.number.toString().padStart(2, '0')}</span>
+                <div className="flex-grow">
+                  <p className="font-bold text-sm line-clamp-1">{ep.title || `Episode ${ep.number}`}</p>
+                  <p className={`text-[10px] uppercase font-bold tracking-widest ${parseInt(episode || "1") === ep.number ? "text-black/60" : "text-white/30"}`}>24:00</p>
+                </div>
+                {parseInt(episode || "1") === ep.number && <Play size={14} fill="currentColor" />}
+              </Link>
+            ))}
           </div>
         </div>
 

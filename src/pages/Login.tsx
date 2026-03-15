@@ -161,6 +161,22 @@ export default function Login() {
               {isLogin ? "Sign Up" : "Login"}
             </button>
           </p>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/10"></div>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-[#0a0a0a] px-2 text-white/20">Or</span>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => navigate("/")}
+            className="w-full bg-white/5 border border-white/10 text-white py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition-all"
+          >
+            Skip for Now
+          </button>
         </div>
       </motion.div>
     </div>
