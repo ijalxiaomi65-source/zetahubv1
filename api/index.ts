@@ -53,6 +53,29 @@ const JWT_SECRET = process.env.JWT_SECRET || "fallback-secret";
 app.use(cors());
 app.use(express.json());
 
+const fetchWithRetry = async (url: string, options: any = {}, retries = 3, backoff = 1000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url, options);
+      if (response.ok) return response;
+      if (response.status === 429) {
+        // Rate limited, wait longer
+        await new Promise(resolve => setTimeout(resolve, backoff * (i + 1) * 2));
+        continue;
+      }
+      if (response.status >= 500) {
+        await new Promise(resolve => setTimeout(resolve, backoff * (i + 1)));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(resolve => setTimeout(resolve, backoff * (i + 1)));
+    }
+  }
+  throw new Error("Max retries reached");
+};
+
 // Proxy for AniList
 const anilistCache = new Map<string, { data: any; timestamp: number }>();
 const ANILIST_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -66,7 +89,7 @@ app.post("/api/proxy/anilist", async (req, res) => {
       return res.json(cached.data);
     }
 
-    const response = await fetch("https://graphql.anilist.co", {
+    const response = await fetchWithRetry("https://graphql.anilist.co", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -95,7 +118,7 @@ app.get("/api/proxy/jikan/*", async (req, res) => {
     const query = new URLSearchParams(req.query as any).toString();
     const url = `https://api.jikan.moe/v4/${path}${query ? "?" + query : ""}`;
     
-    const response = await fetch(url);
+    const response = await fetchWithRetry(url);
     const data = await response.json();
     res.status(response.status).json(data);
   } catch (error) {
@@ -125,7 +148,7 @@ app.get("/api/proxy/tmdb/*", async (req, res) => {
     }
 
     const url = `https://api.themoviedb.org/3/${subPath}?api_key=${apiKey}${query ? "&" + query : ""}`;
-    const response = await fetch(url);
+    const response = await fetchWithRetry(url);
     const data = await response.json();
 
     if (response.ok) {

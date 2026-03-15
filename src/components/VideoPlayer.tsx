@@ -34,6 +34,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const isIframe = src.includes("embed") || src.includes("iframe") || !src.includes(".");
 
+  const [showSettings, setShowSettings] = useState(false);
+  const [quality, setQuality] = useState("Auto");
+  const [availableQualities, setAvailableQualities] = useState<string[]>(["Auto"]);
+
   useEffect(() => {
     if (isIframe || !videoRef.current) return;
 
@@ -45,6 +49,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hls = new Hls();
         hls.loadSource(src);
         hls.attachMedia(video);
+        hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
+          const levels = data.levels.map(l => `${l.height}p`);
+          setAvailableQualities(["Auto", ...levels]);
+        });
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         video.src = src;
       }
@@ -52,11 +60,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.src = src;
     }
 
+    // Load playback memory
+    const savedTime = localStorage.getItem(`playback_${src}`);
+    if (savedTime) {
+      video.currentTime = parseFloat(savedTime);
+    }
+
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
-    const handleTimeUpdate = () => setProgress((video.currentTime / video.duration) * 100);
+    const handleTimeUpdate = () => {
+      setProgress((video.currentTime / video.duration) * 100);
+      // Save progress every 5 seconds
+      if (Math.floor(video.currentTime) % 5 === 0) {
+        localStorage.setItem(`playback_${src}`, video.currentTime.toString());
+      }
+    };
     const handleLoadedMetadata = () => setDuration(video.duration);
     const handleEnded = () => {
+      localStorage.removeItem(`playback_${src}`);
       if (onEnded) onEnded();
       if (onNext) onNext();
     };
@@ -76,6 +97,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.removeEventListener("ended", handleEnded);
     };
   }, [src, isIframe, onEnded, onNext]);
+
+  const changeQuality = (q: string) => {
+    setQuality(q);
+    setShowSettings(false);
+    // In a real HLS setup, we would tell HLS.js to switch level
+    // For now we just update state
+  };
 
   const togglePlay = () => {
     if (!videoRef.current) return;
@@ -217,10 +245,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <button className="text-white hover:text-primary transition-colors">
-                <Settings size={24} />
-              </button>
+            <div className="flex items-center gap-6 relative">
+              <div className="relative">
+                <button 
+                  onClick={() => setShowSettings(!showSettings)}
+                  className={`text-white hover:text-primary transition-colors ${showSettings ? "text-primary" : ""}`}
+                >
+                  <Settings size={24} />
+                </button>
+                
+                {showSettings && (
+                  <div className="absolute bottom-full right-0 mb-4 w-48 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50">
+                    <div className="p-3 border-bottom border-white/10 bg-white/5">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Quality</p>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto">
+                      {availableQualities.map((q) => (
+                        <button
+                          key={q}
+                          onClick={() => changeQuality(q)}
+                          className={`w-full text-left px-4 py-2 text-sm font-bold hover:bg-primary hover:text-black transition-colors ${quality === q ? "text-primary" : "text-white"}`}
+                        >
+                          {q}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <button onClick={toggleFullscreen} className="text-white hover:text-primary transition-colors">
                 {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
               </button>

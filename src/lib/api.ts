@@ -205,12 +205,24 @@ export const searchAnime = async (search: string) => {
 export const fetchTopAiringAnime = async (page: number = 1): Promise<any[]> => {
   try {
     const response = await fetch(`${CONSUMET_URL}/anime/gogoanime/top-airing?page=${page}`);
-    if (!response.ok) throw new Error("Failed to fetch top airing anime");
+    if (!response.ok) throw new Error(`Failed to fetch top airing anime: ${response.status}`);
     const data = await response.json();
+    if (data.error) throw new Error(data.error);
     return data.results || [];
   } catch (error) {
     console.error("fetchTopAiringAnime error:", error);
-    return [];
+    // Fallback to trending anilist if consumet fails
+    try {
+      const fallback = await fetchTrending();
+      return fallback.map((item: any) => ({
+        id: item.id.toString(),
+        title: item.title.english || item.title.romaji,
+        image: item.coverImage.extraLarge || item.coverImage.large,
+        genres: item.genres
+      }));
+    } catch (e) {
+      return [];
+    }
   }
 };
 
@@ -252,9 +264,10 @@ export const fetchAnimeEpisodeStreamGogo = async (episodeId: string): Promise<an
 export const fetchTrendingKdramaTMDB = async (): Promise<any[]> => {
   try {
     const response = await fetch(`${TMDB_URL}/trending/tv/week`);
-    if (!response.ok) throw new Error("Failed to fetch trending TV from TMDB");
+    if (!response.ok) throw new Error(`Failed to fetch trending TV from TMDB: ${response.status}`);
     const data = await response.json();
-    return data.results.filter((item: any) => item.original_language === "ko") || [];
+    if (data.error) throw new Error(data.error);
+    return data.results?.filter((item: any) => item.original_language === "ko") || [];
   } catch (error) {
     console.error("fetchTrendingKdramaTMDB error:", error);
     return [];
@@ -264,9 +277,10 @@ export const fetchTrendingKdramaTMDB = async (): Promise<any[]> => {
 export const fetchPopularKdramaTMDB = async (): Promise<any[]> => {
   try {
     const response = await fetch(`${TMDB_URL}/tv/popular`);
-    if (!response.ok) throw new Error("Failed to fetch popular TV from TMDB");
+    if (!response.ok) throw new Error(`Failed to fetch popular TV from TMDB: ${response.status}`);
     const data = await response.json();
-    return data.results.filter((item: any) => item.original_language === "ko") || [];
+    if (data.error) throw new Error(data.error);
+    return data.results?.filter((item: any) => item.original_language === "ko") || [];
   } catch (error) {
     console.error("fetchPopularKdramaTMDB error:", error);
     return [];
