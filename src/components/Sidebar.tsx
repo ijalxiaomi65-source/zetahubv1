@@ -131,12 +131,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {user.image ? (
                   <img src={user.image} className="w-full h-full object-cover" alt="Avatar" />
                 ) : (
-                  <span className="text-primary font-black">{user.name[0]}</span>
+                  <span className="text-primary font-black">{user.username?.[0] || 'U'}</span>
                 )}
               </div>
               <div className="flex-grow min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-bold truncate">{user.name}</p>
+                  <p className="text-sm font-bold truncate">{user.username}</p>
                   {user.isVip && <Crown size={12} className="text-yellow-500 shrink-0" fill="currentColor" />}
                 </div>
                 <p className="text-[10px] text-white/20 font-black uppercase tracking-widest">

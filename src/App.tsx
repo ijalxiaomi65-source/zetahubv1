@@ -14,15 +14,14 @@ import Search from "./pages/Search";
 import Admin from "./pages/Admin";
 import HumanVerification from "./components/HumanVerification";
 import Sidebar from "./components/Sidebar";
-import PostAuthLoading from "./components/PostAuthLoading";
+import PreparingScreen from "./components/PreparingScreen";
 import { useStore } from "./store/useStore";
 
 export default function App() {
   const [isVerified, setIsVerified] = useState(false);
   const [checking, setChecking] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showPostAuthLoading, setShowPostAuthLoading] = useState(false);
-  const { user } = useStore();
+  const { user, isPreparing } = useStore();
 
   useEffect(() => {
     const verified = sessionStorage.getItem("human_verified");
@@ -32,21 +31,9 @@ export default function App() {
     setChecking(false);
   }, []);
 
-  // Trigger post-auth loading when user first logs in during this session
-  useEffect(() => {
-    if (user && !sessionStorage.getItem("post_auth_loaded")) {
-      setShowPostAuthLoading(true);
-    }
-  }, [user]);
-
   const handleVerify = () => {
     sessionStorage.setItem("human_verified", "true");
     setIsVerified(true);
-  };
-
-  const handlePostAuthComplete = () => {
-    sessionStorage.setItem("post_auth_loaded", "true");
-    setShowPostAuthLoading(false);
   };
 
   if (checking) return null;
@@ -55,8 +42,8 @@ export default function App() {
     return <HumanVerification onVerify={handleVerify} />;
   }
 
-  if (user && showPostAuthLoading) {
-    return <PostAuthLoading onComplete={handlePostAuthComplete} />;
+  if (isPreparing) {
+    return <PreparingScreen />;
   }
 
   return (

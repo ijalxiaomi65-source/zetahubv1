@@ -6,17 +6,17 @@ import { useStore } from "../store/useStore";
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [secret, setSecret] = useState("");
   const navigate = useNavigate();
-  const { setUser, setToken } = useStore();
+  const { setUser, setToken, setIsPreparing } = useStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-    const body = isLogin ? { email, password } : { email, password, name, secret };
+    const body = isLogin ? { email, password } : { email, password, username, secret };
 
     const res = await fetch(endpoint, {
       method: "POST",
@@ -29,7 +29,13 @@ export default function Login() {
       if (isLogin) {
         setToken(data.token);
         setUser(data.user);
-        navigate("/");
+        
+        // Show 15-second loading screen
+        setIsPreparing(true);
+        setTimeout(() => {
+          setIsPreparing(false);
+          navigate("/");
+        }, 15000);
       } else {
         setIsLogin(true);
         alert("Registration successful! Please login.");
@@ -63,15 +69,49 @@ export default function Login() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {!isLogin && (
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Full Name</label>
+              <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Username</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
                 <input 
                   type="text" 
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
-                  placeholder="Ani Master"
+                  placeholder="Choose a username"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {!isLogin && (
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
+                  placeholder="Enter your email"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {isLogin && (
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Email or Username</label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
+                <input 
+                  type="text" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
+                  placeholder="Enter your email or username"
                   required
                 />
               </div>
@@ -93,21 +133,6 @@ export default function Login() {
               </div>
             </div>
           )}
-
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Username</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={18} />
-              <input 
-                type="text" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:border-primary transition-all"
-                placeholder="Enter your username"
-                required
-              />
-            </div>
-          </div>
 
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-white/40 ml-1">Password</label>

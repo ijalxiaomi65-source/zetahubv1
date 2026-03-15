@@ -337,8 +337,8 @@ export const searchAnimeAcrossProviders = async (title: string) => {
 // K-Drama API (Using AsianLoad via Consumet)
 export const fetchTrendingKdrama = async (retryCount = 0): Promise<any[]> => {
   try {
-    // Try AsianLoad first, then DramaCool as fallback
-    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    // Try DramaCool first, then AsianLoad as fallback
+    const provider = retryCount % 2 === 0 ? "dramacool" : "asianload";
     const response = await fetch(`${CONSUMET_URL}/movies/${provider}/trending`);
     if (!response.ok) throw new Error(`Failed to fetch trending K-Drama: ${response.status}`);
     
@@ -361,7 +361,7 @@ export const fetchTrendingKdrama = async (retryCount = 0): Promise<any[]> => {
 
 export const fetchPopularKdrama = async (retryCount = 0): Promise<any[]> => {
   try {
-    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const provider = retryCount % 2 === 0 ? "dramacool" : "asianload";
     const response = await fetch(`${CONSUMET_URL}/movies/${provider}/popular`);
     if (!response.ok) throw new Error(`Failed to fetch popular K-Drama: ${response.status}`);
     
@@ -384,7 +384,7 @@ export const fetchPopularKdrama = async (retryCount = 0): Promise<any[]> => {
 
 export const fetchKdramaDetails = async (id: string, retryCount = 0): Promise<any> => {
   try {
-    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const provider = retryCount % 2 === 0 ? "dramacool" : "asianload";
     const response = await fetch(`${CONSUMET_URL}/movies/${provider}/info?id=${id}`);
     if (!response.ok) throw new Error(`Failed to fetch K-Drama details: ${response.status}`);
     const data = await response.json();
@@ -401,7 +401,7 @@ export const fetchKdramaDetails = async (id: string, retryCount = 0): Promise<an
 
 export const fetchKdramaStream = async (episodeId: string, mediaId: string, retryCount = 0): Promise<any> => {
   try {
-    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const provider = retryCount % 2 === 0 ? "dramacool" : "asianload";
     const response = await fetch(`${CONSUMET_URL}/movies/${provider}/watch?episodeId=${episodeId}&mediaId=${mediaId}`);
     if (!response.ok) throw new Error(`Failed to fetch K-Drama stream: ${response.status}`);
     const data = await response.json();
@@ -418,7 +418,7 @@ export const fetchKdramaStream = async (episodeId: string, mediaId: string, retr
 
 export const searchKdrama = async (query: string, retryCount = 0): Promise<any[]> => {
   try {
-    const provider = retryCount % 2 === 0 ? "asianload" : "dramacool";
+    const provider = retryCount % 2 === 0 ? "dramacool" : "asianload";
     const response = await fetch(`${CONSUMET_URL}/movies/${provider}/${query}`);
     if (!response.ok) throw new Error("Failed to search K-Drama");
     const data = await response.json();
@@ -430,5 +430,92 @@ export const searchKdrama = async (query: string, retryCount = 0): Promise<any[]
       return searchKdrama(query, retryCount + 1);
     }
     return [];
+  }
+};
+
+// User Data Endpoints
+export const saveWatchHistory = async (data: {
+  userId: string;
+  animeId: string;
+  episodeId: string;
+  episodeNum: number;
+  progress: number;
+  duration: number;
+}) => {
+  try {
+    const response = await fetch("/api/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("saveWatchHistory error:", error);
+  }
+};
+
+export const fetchWatchHistory = async (userId: string) => {
+  try {
+    const response = await fetch(`/api/history/${userId}`);
+    return await response.json();
+  } catch (error) {
+    console.error("fetchWatchHistory error:", error);
+    return [];
+  }
+};
+
+export const addToWatchlist = async (data: {
+  userId: string;
+  animeId: string;
+  title: string;
+  image: string;
+  type: string;
+}) => {
+  try {
+    const response = await fetch("/api/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("addToWatchlist error:", error);
+  }
+};
+
+export const fetchWatchlist = async (userId: string) => {
+  try {
+    const response = await fetch(`/api/watchlist/${userId}`);
+    return await response.json();
+  } catch (error) {
+    console.error("fetchWatchlist error:", error);
+    return [];
+  }
+};
+
+export const removeFromWatchlist = async (userId: string, animeId: string) => {
+  try {
+    const response = await fetch(`/api/watchlist/${userId}/${animeId}`, {
+      method: "DELETE",
+    });
+    return await response.json();
+  } catch (error) {
+    console.error("removeFromWatchlist error:", error);
+  }
+};
+
+export const createStripeSession = async (userId: string, plan: string) => {
+  try {
+    const response = await fetch("/api/stripe/create-checkout-session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, plan }),
+    });
+    const data = await response.json();
+    if (data.url) {
+      window.location.href = data.url;
+    }
+  } catch (error) {
+    console.error("createStripeSession error:", error);
   }
 };

@@ -3,19 +3,41 @@ import { User, Crown, History, Heart, Settings, Shield, Play, ArrowLeft, Home, C
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { useStore } from "../store/useStore";
+import { fetchWatchHistory, fetchWatchlist } from "../lib/api";
 
 export default function Profile() {
   const { user, setUser, token } = useStore();
   const [loading, setLoading] = useState(true);
   const [watchHistory, setWatchHistory] = useState<any[]>([]);
+  const [watchlist, setWatchlist] = useState<any[]>([]);
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      
+      try {
+        const [historyData, watchlistData] = await Promise.all([
+          fetchWatchHistory(user.id),
+          fetchWatchlist(user.id)
+        ]);
+        setWatchHistory(historyData);
+        setWatchlist(watchlistData);
+      } catch (error) {
+        console.error("Failed to load profile data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Limit size to 1MB for base64
     if (file.size > 1024 * 1024) {
       alert("Image too large. Please select an image under 1MB.");
       return;
@@ -44,34 +66,6 @@ export default function Profile() {
     };
     reader.readAsDataURL(file);
   };
-
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const history = JSON.parse(localStorage.getItem("watchHistory") || "[]");
-      setWatchHistory(history);
-      
-      if (!token) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        const res = await fetch("/api/user/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data) {
-            setUser(data);
-          }
-        }
-      } catch (e) {
-        console.error("Profile fetch error:", e);
-      }
-      setLoading(false);
-    };
-    fetchProfile();
-  }, [token, setUser]);
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading Profile...</div>;
   if (!user) return <div className="h-screen flex items-center justify-center">Please login to view profile.</div>;
@@ -123,7 +117,7 @@ export default function Profile() {
               )}
             </div>
             <div>
-              <h2 className="text-2xl font-black tracking-tighter">{user.name}</h2>
+              <h2 className="text-2xl font-black tracking-tighter">{user.username}</h2>
               <p className="text-muted text-sm">{user.email}</p>
             </div>
             <div className="flex justify-center gap-2">
@@ -176,40 +170,63 @@ export default function Profile() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {watchHistory.length > 0 ? (
-                watchHistory.map((item: any) => {
-                  const progress = (item.timestamp / item.duration) * 100;
-                  const timeLeft = Math.max(0, Math.floor((item.duration - item.timestamp) / 60));
-                  
-                  return (
-                    <Link 
-                      key={`${item.animeId}-${item.episode}`}
-                      to={`/watch/${item.animeId}/${item.episode}`}
-                      className="group relative aspect-video rounded-2xl overflow-hidden border border-white/10"
-                    >
-                      <img src={item.animeCover || null} className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-500" alt={item.animeTitle} />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-                      <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <h4 className="font-bold line-clamp-1">{item.animeTitle}</h4>
-                        <p className="text-xs text-white/60">Episode {item.episode} • {timeLeft}m left</p>
-                        <div className="w-full h-1 bg-white/20 rounded-full mt-3 overflow-hidden">
-                          <div 
-                            className="h-full bg-primary transition-all duration-500" 
-                            style={{ width: `${Math.min(100, progress)}%` }}
-                          />
-                        </div>
+                watchHistory.map((item: any) => (
+                  <Link 
+                    key={`${item.animeId}-${item.episodeId}`}
+                    to={`/watch/${item.animeId}/${item.episodeId}`}
+                    className="group relative aspect-video rounded-2xl overflow-hidden border border-white/10"
+                  >
+                    <div className="absolute inset-0 bg-white/5" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4">
+                      <h4 className="font-bold line-clamp-1">Episode {item.episodeNum}</h4>
+                      <div className="w-full h-1 bg-white/20 rounded-full mt-3 overflow-hidden">
+                        <div 
+                          className="h-full bg-primary transition-all duration-500" 
+                          style={{ width: `${(item.progress / item.duration) * 100}%` }}
+                        />
                       </div>
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-black">
-                          <Play size={24} fill="currentColor" />
-                        </div>
+                    </div>
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-black">
+                        <Play size={24} fill="currentColor" />
                       </div>
-                    </Link>
-                  );
-                })
+                    </div>
+                  </Link>
+                ))
               ) : (
                 <div className="col-span-full py-12 text-center bg-white/5 rounded-2xl border border-white/5 border-dashed">
                   <Play size={48} className="mx-auto text-white/10 mb-4" />
                   <p className="text-white/40 font-bold">No watch history yet. Start watching some anime!</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <h3 className="text-2xl font-black tracking-tighter flex items-center gap-3">
+              My Watchlist <Heart size={20} className="text-primary" />
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {watchlist.length > 0 ? (
+                watchlist.map((item: any) => (
+                  <Link 
+                    key={item.animeId}
+                    to={`/${item.type}/${item.animeId}`}
+                    className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-white/10"
+                  >
+                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.title} />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+                    <div className="absolute bottom-0 left-0 right-0 p-4">
+                      <h4 className="font-bold line-clamp-1 text-sm">{item.title}</h4>
+                      <p className="text-[10px] text-white/40 uppercase font-black tracking-widest">{item.type}</p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="col-span-full py-12 text-center bg-white/5 rounded-2xl border border-white/5 border-dashed">
+                  <Heart size={48} className="mx-auto text-white/10 mb-4" />
+                  <p className="text-white/40 font-bold">Your watchlist is empty.</p>
                 </div>
               )}
             </div>

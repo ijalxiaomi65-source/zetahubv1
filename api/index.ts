@@ -5,8 +5,11 @@ import path from "path";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import Stripe from "stripe";
 import { createRequire } from "module";
 dotenv.config();
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "");
 
 let prisma: any;
 try {
@@ -18,13 +21,23 @@ try {
   prisma = {
     user: {
       create: async () => { throw new Error("DB_MISSING") },
-      findUnique: async () => { throw new Error("DB_MISSING") }
+      findUnique: async () => { throw new Error("DB_MISSING") },
+      update: async () => { throw new Error("DB_MISSING") }
     },
     subscription: {
-      create: async () => { throw new Error("DB_MISSING") }
+      create: async () => { throw new Error("DB_MISSING") },
+      update: async () => { throw new Error("DB_MISSING") },
+      findUnique: async () => { throw new Error("DB_MISSING") }
     },
     watchlist: {
-      create: async () => { throw new Error("DB_MISSING") }
+      create: async () => { throw new Error("DB_MISSING") },
+      findMany: async () => [],
+      delete: async () => { throw new Error("DB_MISSING") }
+    },
+    history: {
+      create: async () => { throw new Error("DB_MISSING") },
+      upsert: async () => { throw new Error("DB_MISSING") },
+      findMany: async () => []
     },
     comment: {
       findMany: async () => [],
@@ -99,6 +112,7 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
     
     // Try multiple instances if one fails
     const instances = [
+      "https://api.consumet.org",
       "https://consumet-api-production-e65a.up.railway.app",
       "https://consumet-api-clone.vercel.app",
       "https://consumet-api-one.vercel.app",
@@ -112,7 +126,8 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
       "https://consumet-api-nine.vercel.app",
       "https://consumet-api-ten.vercel.app",
       "https://api-consumet-org.vercel.app",
-      "https://api.consumet.org"
+      "https://consumet-org.vercel.app",
+      "https://consumet-api.vercel.app"
     ];
     
     let lastError = null;
@@ -121,14 +136,12 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
       try {
         const url = `${base}/${subPath}${query ? "?" + query : ""}`;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000); // 4s timeout per instance
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
         const response = await fetch(url, {
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             "Accept": "application/json, text/plain, */*",
-            "Origin": base,
-            "Referer": base
           },
           signal: controller.signal
         });
@@ -137,7 +150,7 @@ app.get("/api/proxy/consumet/*", async (req, res) => {
         // If it's a 404, it might be that this specific instance doesn't have the data, 
         // but the instance itself is alive. We should still try others.
         if (response.status === 404) {
-          throw new Error(`Instance ${base} returned 404 (Not Found)`);
+          continue;
         }
 
         if (!response.ok) {
@@ -202,7 +215,7 @@ let mockUsers: any[] = [
 
 // Auth
 router.post("/auth/register", async (req, res) => {
-  const { email, password, name, secret } = req.body;
+  const { email, password, username, secret } = req.body;
   try {
     let role = "USER";
     if (secret && secret === process.env.OWNER_SECRET) {
@@ -210,38 +223,31 @@ router.post("/auth/register", async (req, res) => {
     }
     
     // Special check for Zeta
-    if (name === "Zeta" || email === "Zeta" || email === "zeta@zeta.com") {
+    if (username === "Zeta" || email === "zeta@zeta.com") {
       role = "OWNER";
     }
 
-    let user;
-    try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      user = await prisma.user.create({
-        data: { 
-          email, 
-          password: hashedPassword, 
-          name, 
-          role,
-          isVerified: role === "OWNER"
-        },
-      });
-      
-      // Create default subscription
-      await prisma.subscription.create({
-        data: {
-          userId: user.id,
-          plan: role === "OWNER" ? "PREMIUM" : "FREE",
-          status: "ACTIVE"
-        }
-      });
-    } catch (dbError) {
-      console.warn("Prisma failed, using mock storage:", dbError);
-      user = { id: `mock-${Date.now()}`, email, name, role, isVip: role === "OWNER" || role === "VIP", image: null };
-      mockUsers.push({ ...user, password }); 
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { 
+        email, 
+        username,
+        passwordHash: hashedPassword, 
+        role,
+        isVerified: role === "OWNER"
+      },
+    });
     
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, role: user.role, isVip: user.isVip || role === "OWNER" } });
+    // Create default subscription
+    await prisma.subscription.create({
+      data: {
+        userId: user.id,
+        plan: role === "OWNER" ? "PREMIUM" : "FREE",
+        status: "ACTIVE"
+      }
+    });
+    
+    res.json({ success: true, user: { id: user.id, email: user.email, username: user.username, role: user.role, isVip: role === "OWNER" } });
   } catch (error) {
     console.error("Register error:", error);
     res.status(400).json({ error: "User already exists or invalid data" });
@@ -251,36 +257,23 @@ router.post("/auth/register", async (req, res) => {
 router.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
   
-  // Special check for owner account Zeta
-  if ((email === "Zeta" || email === "zeta@zeta.com") && password === "zeta@11") {
-    return res.json({ 
-      token: jwt.sign({ userId: "owner-1", role: "OWNER" }, JWT_SECRET),
-      user: { id: "owner-1", email: "zeta@zeta.com", name: "Zeta", role: "OWNER", isVip: true }
-    });
-  }
-
   try {
     const user = await prisma.user.findUnique({ 
-      where: { email },
+      where: email.includes("@") ? { email } : { username: email },
       include: { subscription: true }
     });
-    if (user && user.password && (await bcrypt.compare(password, user.password))) {
+
+    if (user && user.passwordHash && (await bcrypt.compare(password, user.passwordHash))) {
       const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET);
       const isVip = user.role === "VIP" || user.role === "OWNER" || user.subscription?.plan === "PREMIUM";
-      return res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role, isVip } });
+      return res.json({ token, user: { id: user.id, email: user.email, username: user.username, role: user.role, isVip } });
     }
-  } catch (dbError) {
-    console.warn("Prisma login failed, checking mock storage");
+    
+    res.status(401).json({ error: "Invalid credentials" });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
-
-  // Check mock storage as fallback
-  const mockUser = mockUsers.find(u => (u.email === email || u.name === email) && u.password === password);
-  if (mockUser) {
-    const token = jwt.sign({ userId: mockUser.id, role: mockUser.role }, JWT_SECRET);
-    return res.json({ token, user: { id: mockUser.id, email: mockUser.email, name: mockUser.name, role: mockUser.role, isVip: mockUser.isVip || mockUser.role === "OWNER" } });
-  }
-
-  res.status(401).json({ error: "Invalid credentials" });
 });
 
 // User Profile
@@ -328,7 +321,119 @@ router.patch("/user/profile", async (req, res) => {
   }
 });
 
-// Watchlist
+// Stripe Checkout
+router.post("/stripe/create-checkout-session", async (req, res) => {
+  const { userId, plan } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { subscription: true } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    let customerId = user.subscription?.stripeCustomerId;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { userId: user.id }
+      });
+      customerId = customer.id;
+      await prisma.subscription.update({
+        where: { userId: user.id },
+        data: { stripeCustomerId: customerId }
+      });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `ZetaHub ${plan} Subscription`,
+              description: "Premium access to all anime and donghua content.",
+            },
+            unit_amount: plan === "PREMIUM" ? 999 : 1999, // $9.99 or $19.99
+            recurring: { interval: "month" },
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "subscription",
+      success_url: `${process.env.APP_URL}/profile?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.APP_URL}/pricing`,
+      metadata: { userId: user.id, plan }
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error("Stripe error:", error);
+    res.status(500).json({ error: "Failed to create checkout session" });
+  }
+});
+
+// Stripe Webhook
+router.post("/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+  } catch (err: any) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as any;
+    const userId = session.metadata.userId;
+    const plan = session.metadata.plan;
+
+    await prisma.subscription.update({
+      where: { userId },
+      data: {
+        plan: plan,
+        status: "ACTIVE",
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      }
+    });
+    
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: "VIP" }
+    });
+  }
+
+  res.json({ received: true });
+});
+
+// Watch History
+router.post("/history", async (req, res) => {
+  const { userId, animeId, episodeId, episodeNum, progress, duration } = req.body;
+  try {
+    const history = await prisma.history.upsert({
+      where: { userId_animeId: { userId, animeId } },
+      update: { episodeId, episodeNum, progress, duration, lastWatched: new Date() },
+      create: { userId, animeId, episodeId, episodeNum, progress, duration }
+    });
+    res.json(history);
+  } catch (error) {
+    res.status(400).json({ error: "Failed to save history" });
+  }
+});
+
+router.get("/history/:userId", async (req, res) => {
+  try {
+    const history = await prisma.history.findMany({
+      where: { userId: req.params.userId },
+      orderBy: { lastWatched: "desc" },
+      take: 20
+    });
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch history" });
+  }
+});
+
+// Favorites (Watchlist)
 router.post("/watchlist", async (req, res) => {
   const { userId, animeId, title, image, type } = req.body;
   try {
@@ -338,6 +443,29 @@ router.post("/watchlist", async (req, res) => {
     res.json(item);
   } catch (error) {
     res.status(400).json({ error: "Already in watchlist" });
+  }
+});
+
+router.get("/watchlist/:userId", async (req, res) => {
+  try {
+    const watchlist = await prisma.watchlist.findMany({
+      where: { userId: req.params.userId },
+      orderBy: { createdAt: "desc" }
+    });
+    res.json(watchlist);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch watchlist" });
+  }
+});
+
+router.delete("/watchlist/:userId/:animeId", async (req, res) => {
+  try {
+    await prisma.watchlist.delete({
+      where: { userId_animeId: { userId: req.params.userId, animeId: req.params.animeId } }
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ error: "Failed to remove from watchlist" });
   }
 });
 

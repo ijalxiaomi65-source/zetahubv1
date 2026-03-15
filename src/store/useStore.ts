@@ -4,7 +4,7 @@ import { persist } from 'zustand/middleware';
 interface User {
   id: string;
   email: string;
-  name: string;
+  username: string;
   role: string;
   isVip: boolean;
   isVerified?: boolean;
@@ -15,7 +15,7 @@ interface WatchlistItem {
   animeId: string;
   title: string;
   image: string;
-  type: 'ANIME' | 'KDRAMA';
+  type: 'anime' | 'donghua' | 'kdrama';
 }
 
 interface AppState {
@@ -23,9 +23,11 @@ interface AppState {
   token: string | null;
   theme: 'dark' | 'light';
   watchlist: WatchlistItem[];
+  isPreparing: boolean;
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
   setTheme: (theme: 'dark' | 'light') => void;
+  setIsPreparing: (isPreparing: boolean) => void;
   addToWatchlist: (item: WatchlistItem) => void;
   removeFromWatchlist: (animeId: string) => void;
   logout: () => void;
@@ -38,9 +40,11 @@ export const useStore = create<AppState>()(
       token: null,
       theme: 'dark',
       watchlist: [],
+      isPreparing: false,
       setUser: (user) => set({ user }),
       setToken: (token) => set({ token }),
       setTheme: (theme) => set({ theme }),
+      setIsPreparing: (isPreparing) => set({ isPreparing }),
       addToWatchlist: (item) => set((state) => ({
         watchlist: state.watchlist.some(i => i.animeId === item.animeId) 
           ? state.watchlist 
